@@ -19,6 +19,8 @@ WASD move; Shift run; Space jump; E interact; M meow; H hide near the bed; drag 
 ## Checks
 
 ```sh
+node tests/threats.test.mjs
+node tests/camera.test.mjs
 node tests/physics.test.mjs
 node tests/world.test.cjs
 node tests/story.test.mjs
@@ -29,6 +31,8 @@ node tests/window.test.mjs
 
 - `dist/index.html`, `dist/style.css`: game shell and interface.
 - `dist/game.js`: 3D world, player, camera, interactions and threats.
+- `dist/threats.mjs`: dog and infected detection and reactions.
+- `dist/camera.mjs`: camera obstacle checks.
 - `dist/physics.mjs`: furniture collisions, support surfaces and jump physics.
 - `dist/story.mjs`: persistent survival state and story progression.
 - `dist/assets/kitten.glb`: the approved kitten model, texture, rig and animations.

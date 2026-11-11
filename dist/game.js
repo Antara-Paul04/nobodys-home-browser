@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { normaliseState,advanceTime,period,takeResource,sleep,guidance } from './story.mjs';
+import { normaliseState,advanceTime,period,takeResource,sleep,guidance,movementMultiplier } from './story.mjs';
+import { constrainCamera } from './camera.mjs';
+import { makeThreat,stepThreat } from './threats.mjs';
 import { insideFurniture,blocksFurniture,stepVertical,frontWallBlocks,groundHeight,clearOfFrontWall } from './physics.mjs';
 
 const $ = id => document.getElementById(id);
@@ -14,7 +16,7 @@ const mats={}; const mat=(name,color,roughness=1)=>mats[name]??(mats[name]=new T
 const M={floor:mat('floor',0x713e35), plank:mat('plank',0x854237),wall:mat('wall',0xe1cfad),trim:mat('trim',0xf1ead7),dark:mat('dark',0x506359),wood:mat('wood',0x8d644b),cream:mat('cream',0xe7ddca),fabric:mat('fabric',0x8d9b85),pink:mat('pink',0xbd8e7c),bowl:mat('bowl',0x9eb3a1),water:mat('water',0x86aeb0,.3),food:mat('food',0x8c664f),grass:mat('grass',0x9eaf8b),road:mat('road',0x777c6d),pave:mat('pave',0xbeb9a6),leaf:mat('leaf',0x7d9872),trunk:mat('trunk',0x806b53),brick:mat('brick',0xb98c75),gold:mat('gold',0xd3af70),glass:mat('glass',0xb4d7cf)};
 M.wall.side=THREE.DoubleSide;
 const unitBox=new THREE.BoxGeometry(1,1,1), unitCylinder=new THREE.CylinderGeometry(1,1,1,12), unitSphere=new THREE.SphereGeometry(1,12,8);
-const cameraFurniture=[];
+const cameraFurniture=[],cameraBuildings=[];
 function box(x,y,z,w,h,d,m){const mesh=new THREE.Mesh(unitBox,m);mesh.position.set(x,y,z);mesh.scale.set(w,h,d);scene.add(mesh);if((m===M.fabric||m===M.wood)&&h>=.35&&x> -4.6&&x<4.6&&z> -4&&z<4)cameraFurniture.push(mesh);return mesh}
 function cylinder(x,y,z,r,h,m,r2=r){const mesh=new THREE.Mesh(unitCylinder,m);mesh.position.set(x,y,z);mesh.scale.set(r,h,r2);scene.add(mesh);return mesh}
 function ball(x,y,z,sx,sy,sz,m){const mesh=new THREE.Mesh(unitSphere,m);mesh.position.set(x,y,z);mesh.scale.set(sx,sy,sz);scene.add(mesh);return mesh}
@@ -63,7 +65,7 @@ for(let x=-12.5;x<13;x+=.55)detail(x,.075,-12.18,.48,.10,.42,M.floor);
 for(let x=-12.8;x<13;x+=.42)detail(x,.035,-7.58,.28,.025,.10,iron);
 // Closely spaced, two-storey houses: shuttered windows and iron balconies.
 function oldHouse(x,z,colour,variant){
- box(x,2.12,z,4.8,4.24,2.65,colour);box(x,4.27,z,5.0,.13,2.84,M.trim);
+ cameraBuildings.push(box(x,2.12,z,4.8,4.24,2.65,colour));box(x,4.27,z,5.0,.13,2.84,M.trim);
  box(x,2.44,z+1.36,4.85,.13,.18,M.trim);box(x,.99,z+1.37,.90,1.98,.10,deepGreen);
  detail(x,2.02,z+1.45,1.1,.10,.12,M.trim);detail(x-.52,1.0,z+1.44,.09,2.0,.10,M.trim);detail(x+.52,1.0,z+1.44,.09,2.0,.10,M.trim);
  for(const dx of [-1.55,1.55]){const wx=x+dx;box(wx,1.3,z+1.39,.80,1.18,.10,deepGreen);detail(wx,1.94,z+1.45,.99,.09,.10,M.trim);for(let y=.83;y<1.82;y+=.10)detail(wx,y,z+1.46,.70,.028,.025,M.fabric);detail(wx,1.35,z+1.49,.03,1.1,.02,iron)}
@@ -98,6 +100,7 @@ actorPart(dog,unitBox,dogFur,0,.34,0,.65,.36,.95);actorPart(dog,unitBox,dogFur,0
 for(const x of [-.22,.22])for(const z of [-.30,.30])actorPart(dog,unitBox,dogFur,x,.14,z,.13,.28,.14);
 for(const x of [-.16,.16])actorPart(dog,unitBox,iron,x,.78,.48,.12,.19,.13);
 const infected=new THREE.Group();scene.add(infected);infected.position.set(-1,0,-10.6);infected.visible=false;
+const dogThreat=makeThreat('dog',dog.position),infectedThreat=makeThreat('infected',infected.position);
 const cloth=mat('infected clothes',0x535a55),skin=mat('infected skin',0x998f7d);
 actorPart(infected,unitBox,cloth,0,.98,0,.48,.70,.27);actorPart(infected,unitSphere,skin,0,1.53,0,.21,.25,.19);
 for(const x of [-.14,.14])actorPart(infected,unitBox,cloth,x,.28,0,.16,.56,.18);
@@ -107,7 +110,8 @@ const rainPositions=new Float32Array(120*6);const rainGeometry=new THREE.BufferG
 const rain=new THREE.LineSegments(rainGeometry,new THREE.LineBasicMaterial({color:0xb4c3c7,transparent:true,opacity:.28,depthWrite:false}));rain.visible=false;rain.frustumCulled=false;scene.add(rain);
 function updateRain(now){const active=state.day>=3&&state.hour>=15&&state.hour<22&&!state.inDark;rain.visible=active;if(!active)return;rain.position.set(catRoot.position.x,0,catRoot.position.z);for(let i=0;i<120;i++){const x=((i*71)%131)/10-6.5,z=((i*43)%127)/10-6.3,y=3-((now*.003+i*.219)%3);const j=i*6;rainPositions[j]=x;rainPositions[j+1]=y;rainPositions[j+2]=z;rainPositions[j+3]=x-.025;rainPositions[j+4]=y-.24;rainPositions[j+5]=z}rainGeometry.attributes.position.needsUpdate=true}
 // A modest dark neighbour's interior, kept away from the lane until entered.
-box(24,-.1,-16,8,.2,7,mat('dark floor',0x544438));box(20,1.5,-16,.15,3,7,mat('dark plaster',0x716c61));box(28,1.5,-16,.15,3,7,mat('dark plaster',0x716c61));box(24,1.5,-19.5,8,3,.15,mat('dark plaster',0x716c61));
+box(24,-.1,-16,8,.2,7,mat('dark floor',0x544438));const darkPlaster=mat('dark plaster',0x716c61);darkPlaster.side=THREE.DoubleSide;
+const darkWalls=[box(20,1.5,-16,.15,3,7,darkPlaster),box(28,1.5,-16,.15,3,7,darkPlaster),box(24,1.5,-19.5,8,3,.15,darkPlaster)];
 box(25,.45,-16.3,1.4,.9,.8,M.wood);box(25,.94,-16.3,1.5,.08,.9,M.cream);cylinder(25,1.01,-16.3,.23,.08,M.food);
 box(21.3,.2,-17.8,.8,.4,.7,M.dark);cylinder(22.0,.12,-14.6,.11,.24,M.cream);cylinder(22.28,.12,-14.6,.11,.24,M.cream);cylinder(22.15,.36,-14.6,.11,.24,M.cream);
 const darkInfected=infected.clone();scene.add(darkInfected);darkInfected.position.set(26,0,-18);darkInfected.visible=false;
@@ -118,13 +122,14 @@ try{const loaded=JSON.parse(localStorage.getItem(SAVE));if(loaded&&typeof loaded
 if(state.inDark){state.x=THREE.MathUtils.clamp(state.x,20.4,27.6);state.z=THREE.MathUtils.clamp(state.z,-19.1,-12.8)}else{state.x=THREE.MathUtils.clamp(state.x,-12,12);state.z=THREE.MathUtils.clamp(state.z,-19,3.7)}
 if(!state.inDark)state.z=clearOfFrontWall(state.z);
 if(state.z> -4&&insideFurniture(state.x,state.z)){state.x=-1.9;state.z=.3}
-let y=0,vertical=0,playing=false,started=false,jumping=false,eatUntil=0,holdClip='Eat',thoughtTimer,captionTimer,quest='',visitorTimer=0,visitorActive=false,noiseTarget=null,threatCooldown=0,lightingTimer=0,broadcastTimer=0;let yaw=.58,pitch=.72,cameraDistance=5.3,dragging=false,lastX=0,lastY=0,renderLast=0,prev=0,saveTime=0;
-const keys=new Set();const targetLook=new THREE.Vector3(), cameraGoal=new THREE.Vector3(),cameraRay=new THREE.Raycaster(),cameraDirection=new THREE.Vector3();
-const cameraWalls=[leftWall,rightWall,backWall,frontLeft,frontRight,windowLower,windowUpper,...cameraFurniture];
+let y=0,vertical=0,playing=false,started=false,jumping=false,eatUntil=0,holdClip='Eat',thoughtTimer,captionTimer,quest='',visitorTimer=0,visitorActive=false,noiseTarget=null,noiseSerial=0,threatCooldown=0,lightingTimer=0,broadcastTimer=0;let yaw=.58,pitch=.72,cameraDistance=5.3,dragging=false,lastX=0,lastY=0,renderLast=0,prev=0,saveTime=0;
+const keys=new Set();const targetLook=new THREE.Vector3(), cameraGoal=new THREE.Vector3(),cameraRay=new THREE.Raycaster();
+const cameraWalls=[leftWall,rightWall,backWall,frontLeft,frontRight,windowLower,windowUpper,...cameraFurniture,...cameraBuildings,...darkWalls];
 function say(text,ms=4500){$('thought').textContent=text;$('thought').classList.add('show');clearTimeout(thoughtTimer);thoughtTimer=setTimeout(()=>$('thought').classList.remove('show'),ms)}
 function save(){state.x=catRoot.position.x;state.z=catRoot.position.z;try{localStorage.setItem(SAVE,JSON.stringify(state))}catch{}}
 function questUI(){const q=guidance(state);if(quest!==q[0]){quest=q[0];$('quest-title').textContent=q[0];$('quest-copy').textContent=q[1];$('quest-index').textContent='✳';$('quest-category').textContent='A NORTH KOLKATA MORNING'}
- $('food-bar').style.width=state.food+'%';$('water-bar').style.width=state.water+'%';$('energy-bar').style.width=state.energy+'%';homeFoodBowl.contents.visible=state.homeFood>0;homeWaterBowl.contents.visible=state.homeWater>0;streetFoodVisual.visible=state.streetFood>0;porchFoodBowl.contents.visible=state.porchFood>0;$('period-label').textContent='NORTH KOLKATA · '+period(state).toUpperCase()}
+ $('food-bar').style.width=state.food+'%';$('water-bar').style.width=state.water+'%';$('energy-bar').style.width=state.energy+'%';
+ for(const [id,value] of [['food-bar',state.food],['water-bar',state.water],['energy-bar',state.energy]])$(id).parentElement.classList.toggle('critical',value<15);homeFoodBowl.contents.visible=state.homeFood>0;homeWaterBowl.contents.visible=state.homeWater>0;streetFoodVisual.visible=state.streetFood>0;porchFoodBowl.contents.visible=state.porchFood>0;$('period-label').textContent='NORTH KOLKATA · '+period(state).toUpperCase()}
 const items=[{x:-3,z:2.2,r:2.3,label:'Look for your person',type:'bed',zone:'home'},{x:2.75,z:1.85,r:1.1,label:'Eat breakfast',type:'food',zone:'home'},{x:3.48,z:1.85,r:1.05,label:'Drink water',type:'water',zone:'home'},{x:3.8,z:-1.65,r:1.25,label:'Investigate the television',type:'tv',zone:'home'},{x:2.8,z:3.9,r:1.05,label:'Try the front door',type:'door',zone:'home'},{x:-3.2,z:-3.65,r:1.4,label:'Look at the open window',type:'window'},{x:8.7,z:-8.55,r:1.15,label:'Investigate the dropped food',type:'streetFood',zone:'street'},{x:-7.5,z:-11.95,r:1.1,label:'Investigate the porch dish',type:'porchFood',zone:'street'},{x:3.8,z:-5.4,r:1.1,label:'Drink from the tap puddle',type:'streetWater',zone:'street'},{x:-2.6,z:-11.95,r:1.15,label:'Enter the quiet house',type:'enterHouse',zone:'street'},{x:10.9,z:-11.95,r:1.3,label:'Listen to the radio',type:'radio',zone:'street'},{x:24,z:-13.0,r:1.3,label:'Return to the lane',type:'exitHouse',zone:'dark'},{x:24.4,z:-16.3,r:1.5,label:'Investigate the food',type:'darkFood',zone:'dark'},{x:22.1,z:-14.6,r:1.05,label:'Nudge the tins',type:'tins',zone:'dark'},{x:26,z:-17.0,r:1.2,label:'Listen at the inner door',type:'innerDoor',zone:'dark'}];
 function nearby(){let nearest=null,best=Infinity;for(const item of items){if(state.inDark&&item.zone!=='dark')continue;if(!state.inDark&&item.zone==='dark')continue;if(item.zone==='home'&&catRoot.position.z< -4.05)continue;if(item.zone==='street'&&catRoot.position.z> -4.05)continue;const d=Math.hypot(catRoot.position.x-item.x,catRoot.position.z-item.z);if(d<item.r&&d<best){nearest=item;best=d}}return nearest}
 function itemLabel(item){if(item.type==='bed'&&state.owner)return 'Rest by the bed';if(item.type==='food'&&state.homeFood<=0)return 'Inspect the empty bowl';if(item.type==='water'&&state.homeWater<=0)return 'Inspect the empty water bowl';if(['streetFood','porchFood','streetWater','darkFood'].includes(item.type)&&state[item.type]<=0)return 'Nothing left here';return item.label}
@@ -155,20 +160,23 @@ function updateLighting(){const h=state.hour;const fog=sampleRamp(h,[[0,0x0a0b12
  sun.color.copy(sampleRamp(h,[[0,0x292f50],[6,0xffbf8c],[9,0xfff2e0],[16.5,0xffe0b8],[18.5,0xffa86b],[19.7,0xd96b4d],[20.4,0x4d577f],[24,0x292f50]]));
  const dark=period(state)==='night'||state.inDark;sun.intensity=dark?.18:.72;ambient.intensity=dark?.42:.92;ambient.color.set(dark?0x56627f:0xffeed7);ambient.groundColor.set(dark?0x252b3a:0x778576)}
 function toggleHiding(){const nearBed=catRoot.position.z>-4&&Math.hypot(catRoot.position.x+3,catRoot.position.z-2.2)<2.4;if(!state.hidden&&!nearBed){say('There might be room under the bed.');return}state.hidden=!state.hidden;catRoot.visible=!state.hidden;$('shell').classList.toggle('hiding',state.hidden);if(state.hidden){state.dangerLearned=state.dangerLearned||visitorActive;say('Small. Dark. Quiet.')}else say('Carefully, back out.');save()}
-function emitNoise(radius,kind='other',origin=catRoot.position){if(state.hidden&&kind==='meow'){say('Best to stay quiet here.');return}noiseTarget={x:origin.x,z:origin.z,life:8,radius:radius*(period(state)==='night'?1.5:1)};if(visitorActive){visitorTimer=Math.max(0,visitorTimer-5);say('The scratching at the window gets louder.')}if(kind==='meow'&&typeof AudioContext!=='undefined'){try{const ac=new AudioContext(),osc=ac.createOscillator(),gain=ac.createGain();osc.type='sine';osc.frequency.setValueAtTime(580,ac.currentTime);osc.frequency.exponentialRampToValueAtTime(360,ac.currentTime+.18);gain.gain.setValueAtTime(.025,ac.currentTime);gain.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+.22);osc.connect(gain);gain.connect(ac.destination);osc.start();osc.stop(ac.currentTime+.23);osc.onended=()=>ac.close()}catch{}}}
+function emitNoise(radius,kind='other',origin=catRoot.position){if(state.hidden&&kind==='meow'){say('Best to stay quiet here.');return}noiseTarget={id:++noiseSerial,x:origin.x,z:origin.z,life:8,radius:radius*(period(state)==='night'?1.5:1)};if(visitorActive){visitorTimer=Math.max(0,visitorTimer-5);say('The scratching at the window gets louder.')}if(kind==='meow'&&typeof AudioContext!=='undefined'){try{const ac=new AudioContext(),osc=ac.createOscillator(),gain=ac.createGain();osc.type='sine';osc.frequency.setValueAtTime(580,ac.currentTime);osc.frequency.exponentialRampToValueAtTime(360,ac.currentTime+.18);gain.gain.setValueAtTime(.025,ac.currentTime);gain.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+.22);osc.connect(gain);gain.connect(ac.destination);osc.start();osc.stop(ac.currentTime+.23);osc.onended=()=>ac.close()}catch{}}}
 function updateThreats(dt){
  darkInfected.visible=state.inDark;darkFigure.visible=state.inDark;darkInfected.rotation.z=state.darkAwake?0:.65;
  if(threatCooldown>0)threatCooldown-=dt;if(noiseTarget){noiseTarget.life-=dt;if(noiseTarget.life<=0)noiseTarget=null}
  if(visitorActive){visitorTimer+=dt;infected.visible=true;infected.position.set(-3.2,0,-5.05);infected.rotation.y=Math.sin(visitorTimer*1.5)*.16;
-  if(visitorTimer>28){visitorActive=false;state.visitorDone=true;state.nightWarning=false;state.dangerLearned=true;infected.visible=state.day>=2;infected.position.set(-1,0,-10.6);say('The sounds fade away. Quiet again.',5000);save()}}
+  if(visitorTimer>28){visitorActive=false;state.visitorDone=true;state.nightWarning=false;state.dangerLearned=true;infected.visible=state.day>=2;infected.position.set(-1,0,-10.6);infectedThreat.mode='idle';infectedThreat.timer=0;say('The sounds fade away. Quiet again.',5000);save()}}
  else infected.visible=state.day>=2;
  const outside=catRoot.position.z< -4.08&&!state.inDark;
- function chase(actor,range,speed,isInfected){let dx=catRoot.position.x-actor.position.x,dz=catRoot.position.z-actor.position.z,dist=Math.hypot(dx,dz);let alert=outside&&!state.hidden&&dist<range;
-  if(noiseTarget&&Math.hypot(noiseTarget.x-actor.position.x,noiseTarget.z-actor.position.z)<noiseTarget.radius){if(isInfected){state.noiseLesson=true;sayOnceNoise()}if(!alert){dx=noiseTarget.x-actor.position.x;dz=noiseTarget.z-actor.position.z;dist=Math.hypot(dx,dz);alert=true}}
-  if(alert&&dist>.6){actor.position.x+=dx/dist*speed*dt;actor.position.z+=dz/dist*speed*dt;actor.position.z=Math.min(-4.35,actor.position.z);actor.rotation.y=Math.atan2(dx,dz)}
-  if(alert&&outside&&!state.hidden&&dist<.62&&threatCooldown<=0){threatCooldown=5;state.dangerLearned=true;catRoot.position.set(-1.9,0,.3);y=vertical=0;jumping=false;noiseTarget=null;say(isInfected?'Hands. Not that way.':'Teeth. Not that way.',5000);save()}}
- if(!visitorActive){if(state.day>=2){chase(infected,3.5,.9,true);if(outside&&Math.hypot(infected.position.x-catRoot.position.x,infected.position.z-catRoot.position.z)<5)state.seenInfected=true}}
- chase(dog,3.3,1.25,false);
+ const player={x:catRoot.position.x,z:catRoot.position.z,y,hidden:state.hidden,outside};
+ function advanceAgent(agent,mesh){
+  const result=stepThreat(agent,dt,player,noiseTarget);if(typeof agent.position.rotation==='number')mesh.rotation.y=agent.position.rotation;
+  if(result.noticedNoise&&agent.kind==='infected'){state.noiseLesson=true;sayOnceNoise()}
+  if(result.escaped){state.dangerLearned=true;say(agent.kind==='dog'?'The dog has lost the scent.':'The footsteps fade away.',4000)}
+  if(result.caught&&threatCooldown<=0){threatCooldown=5;state.dangerLearned=true;catRoot.position.set(-1.9,0,.3);y=vertical=0;jumping=false;noiseTarget=null;say(agent.kind==='dog'?'Teeth. Not that way.':'Hands. Not that way.',5000);save()}
+ }
+ if(!visitorActive&&state.day>=2){advanceAgent(infectedThreat,infected);if(outside&&Math.hypot(infected.position.x-catRoot.position.x,infected.position.z-catRoot.position.z)<5)state.seenInfected=true}
+ advanceAgent(dogThreat,dog);
  if(state.inDark&&state.darkAwake&&!state.hidden){const dx=catRoot.position.x-darkInfected.position.x,dz=catRoot.position.z-darkInfected.position.z,d=Math.hypot(dx,dz);if(d>.6){darkInfected.position.x+=dx/d*.65*dt;darkInfected.position.z+=dz/d*.65*dt;darkInfected.rotation.y=Math.atan2(dx,dz)}if(d<.7&&threatCooldown<=0){state.inDark=false;state.dangerLearned=true;state.noiseLesson=true;catRoot.position.set(-2.6,0,-11);threatCooldown=5;updateLighting();say('Hands. Back outside.',5000);save()}}
  
 }
@@ -176,7 +184,7 @@ let noiseHintShown=false;function sayOnceNoise(){if(!noiseHintShown){noiseHintSh
 function animate(name,force=false){if(currentAction===name&&!force)return;let next=actions[name]||actions.Idle;if(!next)return;const previous=actions[currentAction];if(previous&&previous!==next)previous.fadeOut(.18);next.reset().fadeIn(.18).play();currentAction=name}
 new GLTFLoader().load('./assets/kitten.glb',gltf=>{const model=gltf.scene;catRoot.add(model);model.updateMatrixWorld(true);const bounds=new THREE.Box3().setFromObject(model),size=new THREE.Vector3();bounds.getSize(size);const scale=.64/Math.max(size.y,.001);model.scale.setScalar(scale);model.updateMatrixWorld(true);const fitted=new THREE.Box3().setFromObject(model);model.position.y-=fitted.min.y;model.position.x-=(fitted.min.x+fitted.max.x)/2;model.position.z-=(fitted.min.z+fitted.max.z)/2;modelHeight=.64;model.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false}});mixer=new THREE.AnimationMixer(model);for(const clip of gltf.animations){if(clip.name==='Jump')clip.tracks=clip.tracks.filter(t=>!t.name.endsWith('Hips.position'));actions[clip.name]=mixer.clipAction(clip);if(['Jump','LieDown','WakeUp'].includes(clip.name)){actions[clip.name].setLoop(THREE.LoopOnce,1);actions[clip.name].clampWhenFinished=true}}animate('Idle');catRoot.position.set(state.x,0,state.z);questUI();updateLighting();$('loading').hidden=true;$('start-btn').disabled=false;$('start-btn').innerHTML='Begin the morning <span>↗</span>';renderOnce();},undefined,error=>{$('loading-detail').textContent='The kitten could not be loaded. Please reload the page.';console.error(error)});
 // Keep the walls opaque. Move the camera to the near side of a wall when needed.
-function placeCamera(target,desired,dt=1){cameraDirection.subVectors(desired,target);const distance=cameraDirection.length();if(distance>.001){cameraDirection.divideScalar(distance);cameraRay.set(target,cameraDirection);cameraRay.far=distance;const hits=cameraRay.intersectObjects(cameraWalls,false);if(hits.length)desired.copy(target).addScaledVector(cameraDirection,Math.max(.18,hits[0].distance-.12))}camera.position.lerp(desired,Math.min(1,dt*9));camera.lookAt(target)}
+function placeCamera(target,desired,dt=1){camera.position.lerp(desired,Math.min(1,dt*9));constrainCamera(target,camera.position,cameraWalls,cameraRay);camera.lookAt(target)}
 function renderOnce(){targetLook.set(catRoot.position.x,.5,catRoot.position.z);cameraGoal.set(targetLook.x+Math.sin(yaw)*Math.cos(pitch)*cameraDistance,targetLook.y+Math.sin(pitch)*cameraDistance,targetLook.z+Math.cos(yaw)*Math.cos(pitch)*cameraDistance);scene.updateMatrixWorld(true);camera.position.copy(targetLook);placeCamera(targetLook,cameraGoal,1);renderer.render(scene,camera)}
 function pause(){if(!started)return;playing=false;keys.clear();$('pause').hidden=false;save()}
 function resume(){if(!started)return;$('pause').hidden=true;playing=true;prev=performance.now();renderLast=0;requestAnimationFrame(frame)}
@@ -199,7 +207,7 @@ function validPosition(x,z,height){if(state.inDark){if(x<20.4||x>27.6||z< -19.1|
  return true}
 function frame(now){if(!playing)return;requestAnimationFrame(frame);if(now-renderLast<1000/24)return;const dt=Math.min((now-prev)/1000,.08);prev=now;renderLast=now;
  let a=(keys.has('KeyD')||keys.has('ArrowRight')?1:0)-(keys.has('KeyA')||keys.has('ArrowLeft')?1:0);let b=(keys.has('KeyW')||keys.has('ArrowUp')?1:0)-(keys.has('KeyS')||keys.has('ArrowDown')?1:0);let move=new THREE.Vector3();if(performance.now()>eatUntil&&!state.hidden){const forward=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw)),right=new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));move.addScaledVector(forward,b).addScaledVector(right,a);if(move.lengthSq()>0)move.normalize()}
- const running=keys.has('ShiftLeft')||keys.has('ShiftRight');const speed=running?2.8:1.55;const beforeX=catRoot.position.x,beforeZ=catRoot.position.z;let nx=catRoot.position.x+move.x*speed*dt,nz=catRoot.position.z+move.z*speed*dt;if(validPosition(nx,catRoot.position.z,y))catRoot.position.x=nx;if(validPosition(catRoot.position.x,nz,y))catRoot.position.z=nz;
+ const running=keys.has('ShiftLeft')||keys.has('ShiftRight');const speed=(running?2.8:1.55)*movementMultiplier(state);const beforeX=catRoot.position.x,beforeZ=catRoot.position.z;let nx=catRoot.position.x+move.x*speed*dt,nz=catRoot.position.z+move.z*speed*dt;if(validPosition(nx,catRoot.position.z,y))catRoot.position.x=nx;if(validPosition(catRoot.position.x,nz,y))catRoot.position.z=nz;
  if(move.lengthSq()>.001){const target=Math.atan2(move.x,move.z);let diff=Math.atan2(Math.sin(target-catRoot.rotation.y),Math.cos(target-catRoot.rotation.y));catRoot.rotation.y+=diff*Math.min(1,dt*9)}
  if(!state.inDark&&!jumping&&frontWallBlocks(catRoot.position.x,catRoot.position.z,y))catRoot.position.z=clearOfFrontWall(catRoot.position.z);
  const ground=state.inDark?0:groundHeight(catRoot.position.x,catRoot.position.z);

@@ -5,3 +5,5 @@
 
 /* Dark, restrained interface suited to the unsettling tone. */
 .notes,.status{background:#202823eF;color:#e9e8dc;border:1px solid #6d786744;box-shadow:0 8px 32px #080e0bc0}.note-copy{color:#b0b7a9}.note-line{background:#57645a}.note-title{color:#f0eee4}.eyebrow{color:#a9b4a2}.progress{color:#9aa698}.bar{background:#4e5d51}.round{background:#26342de8;color:#f2f0e6;border:1px solid #a3b5a055}.top-right{gap:6px}#prompt{background:#202a24ed;color:#f1eee2;border:1px solid #6b7a67}#prompt kbd{background:#4e6255}.modal{background:#252f29;color:#f1f0e8}.modal p{color:#b1bbad}.secondary{border-color:#7d8b7b;color:#e4e7db}.start-card{background:#c8c5b6}.card-art{background:linear-gradient(145deg,#69786b,#a59f8b)}.sun-disc{background:#c9bea5}.start-copy p{color:#58675b}.card-bottom{border-color:#aaa99b;color:#5d6b60}.status .stat span:not(.stat-icon){color:#e6e8df}
+
+.bar.critical b{background:#d75d4b;box-shadow:0 0 7px #a04233aa}

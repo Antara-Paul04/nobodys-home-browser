@@ -38,3 +38,5 @@ export function guidance(s){
  if(s.chapterComplete)return ['Still here','The neighbourhood is changing. Keep exploring.'];
  return ['The quiet neighbourhood','Explore, find food and water, and return somewhere safe when tired.'];
 }
+// Matches the Unity prototype: critical needs slow the cat rather than killing it.
+export function movementMultiplier(s){let speed=1;if(s.food<15)speed-=.22;if(s.water<15)speed-=.14;if(s.energy<15)speed-=.14;return Math.max(.4,Math.min(1,speed))}

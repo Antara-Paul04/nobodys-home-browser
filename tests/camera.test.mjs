@@ -1,0 +1,5 @@
+import assert from 'node:assert/strict';import * as THREE from '../dist/vendor/three/build/three.module.js';import {constrainCamera} from '../dist/camera.mjs';
+const wall=new THREE.Mesh(new THREE.BoxGeometry(.2,4,5),new THREE.MeshBasicMaterial({side:THREE.DoubleSide}));wall.position.x=2;wall.updateMatrixWorld(true);
+const target=new THREE.Vector3(0,1,0),camera=new THREE.Vector3(4,1,0);assert.equal(constrainCamera(target,camera,[wall],new THREE.Raycaster()),true);assert.ok(camera.x<1.9,'camera stays on near side of wall');
+const clear=new THREE.Vector3(1,1,0);assert.equal(constrainCamera(target,clear,[wall],new THREE.Raycaster()),false);assert.equal(clear.x,1,'unobstructed zoom remains unchanged');
+const reverseTarget=new THREE.Vector3(4,1,0),reverseCamera=new THREE.Vector3(0,1,0);assert.equal(constrainCamera(reverseTarget,reverseCamera,[wall],new THREE.Raycaster()),true);assert.ok(reverseCamera.x>2.1,'wall blocks camera from either side');console.log('Camera wall collision in both directions passed.');

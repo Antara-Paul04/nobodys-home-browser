@@ -11,3 +11,4 @@ let night=normaliseState({hour:22.49});assert.deepEqual(advanceTime(night,2),['v
 let olderSave=normaliseState({day:2,homeFood:0});assert.equal(olderSave.darkFood,1);assert.equal(takeResource(olderSave,'darkFood'),true);assert.equal(olderSave.outsideFood,true);assert.equal(takeResource(olderSave,'darkFood'),false);
 let chapter=normaliseState({day:2,hour:20,outsideFood:true,outsideWater:true,dangerLearned:true,noiseLesson:true,returnedHome:true});assert.equal(sleep(chapter,true).event,'chapter');assert.equal(chapter.chapterComplete,true);
 console.log('Optional opening, visitor, older saves and chapter completion passed.');
+const {movementMultiplier}=await import('../dist/story.mjs');assert.equal(movementMultiplier({food:100,water:100,energy:100}),1);assert.equal(movementMultiplier({food:0,water:100,energy:100}),.78);assert.ok(Math.abs(movementMultiplier({food:0,water:0,energy:0})-.5)<1e-9);console.log('Low needs slow the cat without blocking progress.');
