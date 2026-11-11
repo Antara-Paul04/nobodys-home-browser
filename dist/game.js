@@ -1,18 +1,21 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { normaliseState,advanceTime,period,takeResource,sleep,guidance } from './story.mjs';
+import { insideFurniture,blocksFurniture,supportHeight,stepVertical } from './physics.mjs';
 
 const $ = id => document.getElementById(id);
 const SAVE='nobodys-home-web-first-morning-v1';
-const scene=new THREE.Scene(); scene.background=new THREE.Color(0xb8c9bc); scene.fog=new THREE.Fog(0xb8c9bc,23,44);
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0xb8c9bc); scene.fog=new THREE.Fog(0x69746f,15,36);
 const camera=new THREE.PerspectiveCamera(42,innerWidth/innerHeight,.05,100);
 const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'low-power',alpha:false});
-renderer.setPixelRatio(Math.min(devicePixelRatio||1,1)); renderer.setSize(innerWidth,innerHeight); renderer.outputColorSpace=THREE.SRGBColorSpace; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.1; $('game').appendChild(renderer.domElement);
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,1)); renderer.setSize(innerWidth,innerHeight); renderer.outputColorSpace=THREE.SRGBColorSpace; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=.72; $('game').appendChild(renderer.domElement);
 const ambient=new THREE.HemisphereLight(0xf7edce,0x667d6f,2.1); scene.add(ambient); const sun=new THREE.DirectionalLight(0xffe8bb,2); sun.position.set(-5,10,6); scene.add(sun);
 const mats={}; const mat=(name,color,roughness=1)=>mats[name]??(mats[name]=new THREE.MeshStandardMaterial({color,roughness}));
-const M={floor:mat('floor',0x9e4e3c), plank:mat('plank',0x854237),wall:mat('wall',0xe1cfad),trim:mat('trim',0xf1ead7),dark:mat('dark',0x506359),wood:mat('wood',0x8d644b),cream:mat('cream',0xe7ddca),fabric:mat('fabric',0x8d9b85),pink:mat('pink',0xbd8e7c),bowl:mat('bowl',0x9eb3a1),water:mat('water',0x86aeb0,.3),food:mat('food',0x8c664f),grass:mat('grass',0x9eaf8b),road:mat('road',0x777c6d),pave:mat('pave',0xbeb9a6),leaf:mat('leaf',0x7d9872),trunk:mat('trunk',0x806b53),brick:mat('brick',0xb98c75),gold:mat('gold',0xd3af70),glass:mat('glass',0xb4d7cf)};
+const M={floor:mat('floor',0x713e35), plank:mat('plank',0x854237),wall:mat('wall',0xe1cfad),trim:mat('trim',0xf1ead7),dark:mat('dark',0x506359),wood:mat('wood',0x8d644b),cream:mat('cream',0xe7ddca),fabric:mat('fabric',0x8d9b85),pink:mat('pink',0xbd8e7c),bowl:mat('bowl',0x9eb3a1),water:mat('water',0x86aeb0,.3),food:mat('food',0x8c664f),grass:mat('grass',0x9eaf8b),road:mat('road',0x777c6d),pave:mat('pave',0xbeb9a6),leaf:mat('leaf',0x7d9872),trunk:mat('trunk',0x806b53),brick:mat('brick',0xb98c75),gold:mat('gold',0xd3af70),glass:mat('glass',0xb4d7cf)};
+M.wall.side=THREE.DoubleSide;
 const unitBox=new THREE.BoxGeometry(1,1,1), unitCylinder=new THREE.CylinderGeometry(1,1,1,12), unitSphere=new THREE.SphereGeometry(1,12,8);
-function box(x,y,z,w,h,d,m){const mesh=new THREE.Mesh(unitBox,m);mesh.position.set(x,y,z);mesh.scale.set(w,h,d);scene.add(mesh);return mesh}
+const cameraFurniture=[];
+function box(x,y,z,w,h,d,m){const mesh=new THREE.Mesh(unitBox,m);mesh.position.set(x,y,z);mesh.scale.set(w,h,d);scene.add(mesh);if((m===M.fabric||m===M.wood)&&h>=.35&&x> -4.6&&x<4.6&&z> -4&&z<4)cameraFurniture.push(mesh);return mesh}
 function cylinder(x,y,z,r,h,m,r2=r){const mesh=new THREE.Mesh(unitCylinder,m);mesh.position.set(x,y,z);mesh.scale.set(r,h,r2);scene.add(mesh);return mesh}
 function ball(x,y,z,sx,sy,sz,m){const mesh=new THREE.Mesh(unitSphere,m);mesh.position.set(x,y,z);mesh.scale.set(sx,sy,sz);scene.add(mesh);return mesh}
 // Small architectural details are instanced by material to keep draw calls low.
@@ -25,9 +28,9 @@ box(0,-.1,0,9,.2,8,M.floor);
 for(let x=-4.28;x<4.3;x+=.34){detail(x,.006,-3.72,.30,.012,.17,M.cream);detail(x,.007,3.72,.30,.012,.17,M.cream)}
 for(let z=-3.45;z<3.5;z+=.34){detail(-4.25,.006,z,.17,.012,.30,M.cream);detail(4.25,.006,z,.17,.012,.30,M.cream)}
 const leftWall=box(-4.55,1.5,0,.15,3,8,M.wall),rightWall=box(4.55,1.5,0,.15,3,8,M.wall),backWall=box(0,1.5,4.05,9.2,3,.15,M.wall);
-box(-4.1,1.5,-4.05,.9,3,.16,M.wall);box(.95,1.5,-4.05,7.3,3,.16,M.wall);
+const frontLeft=box(-4.1,1.5,-4.05,.9,3,.16,M.wall),frontRight=box(.95,1.5,-4.05,7.3,3,.16,M.wall);
 // Working opening through the wall: shutters folded outward, sill clear.
-box(-3.2,.32,-4.05,.9,.64,.17,M.wall);box(-3.2,2.1,-4.05,.9,1.8,.17,M.wall);box(-3.2,.66,-4.05,1.02,.08,.3,M.trim);box(-3.2,1.27,-4.05,1.03,.06,.24,M.trim);
+const windowLower=box(-3.2,.32,-4.05,.9,.64,.17,M.wall),windowUpper=box(-3.2,2.1,-4.05,.9,1.8,.17,M.wall);box(-3.2,.66,-4.05,1.02,.08,.3,M.trim);box(-3.2,1.27,-4.05,1.03,.06,.24,M.trim);
 box(-3.68,.97,-4.05,.08,1.3,.23,M.trim);box(-2.72,.97,-4.05,.08,1.3,.23,M.trim);
 // Open, side-folded khorkhori shutters: they do not block the window route.
 for(const x of [-3.83,-2.57]){box(x,.98,-4.03,.24,.67,.07,deepGreen);for(let y=.72;y<1.28;y+=.08)detail(x,y,-3.98,.19,.025,.025,M.fabric)}
@@ -109,24 +112,14 @@ box(25,.45,-16.3,1.4,.9,.8,M.wood);box(25,.94,-16.3,1.5,.08,.9,M.cream);cylinder
 box(21.3,.2,-17.8,.8,.4,.7,M.dark);cylinder(22.0,.12,-14.6,.11,.24,M.cream);cylinder(22.28,.12,-14.6,.11,.24,M.cream);cylinder(22.15,.36,-14.6,.11,.24,M.cream);
 const darkInfected=infected.clone();scene.add(darkInfected);darkInfected.position.set(26,0,-18);darkInfected.visible=false;
 const darkFigure=infected.clone();scene.add(darkFigure);darkFigure.position.set(27.25,0,-18.6);darkFigure.visible=false;
-// Furniture is solid at every jump height until proper climbing is implemented.
-// The extra margin accounts for the width of the cat rather than treating it as a point.
-const catRadius=.16;
-const solidFurniture=[
- {name:'bed',minX:-4.075,maxX:-1.725,minZ:1.30,maxZ:3.10},
- {name:'bedside table',minX:-4.445,maxX:-3.795,minZ:.475,maxZ:1.125},
- {name:'sofa',minX:-1.21,maxX:.51,minZ:-.025,maxZ:.73},
- {name:'coffee table',minX:.71,maxX:1.79,minZ:-.475,maxZ:.275},
- {name:'television cabinet',minX:3.28,maxX:4.38,minZ:-1.925,maxZ:-1.375}
-];
-function insideFurniture(x,z){return solidFurniture.some(o=>x>o.minX-catRadius&&x<o.maxX+catRadius&&z>o.minZ-catRadius&&z<o.maxZ+catRadius)}
 const catRoot=new THREE.Group();scene.add(catRoot);let mixer,actions={},currentAction='',modelHeight=.6;
 let state=normaliseState({x:-1.9,z:.3,food:55,water:62,owner:false,ate:false,drank:false,tv:false,outside:false});
 try{const loaded=JSON.parse(localStorage.getItem(SAVE));if(loaded&&typeof loaded.x==='number'&&Number.isFinite(loaded.x))state=normaliseState({...state,...loaded})}catch{}
 if(state.inDark){state.x=THREE.MathUtils.clamp(state.x,20.4,27.6);state.z=THREE.MathUtils.clamp(state.z,-19.1,-12.8)}else{state.x=THREE.MathUtils.clamp(state.x,-12,12);state.z=THREE.MathUtils.clamp(state.z,-19,3.7)}
 if(state.z> -4&&insideFurniture(state.x,state.z)){state.x=-1.9;state.z=.3}
-let y=0,vertical=0,playing=false,started=false,jumping=false,eatUntil=0,holdClip='Eat',thoughtTimer,captionTimer,quest='',visitorTimer=0,visitorActive=false,noiseTarget=null,threatCooldown=0,lightingTimer=0,broadcastTimer=0;let yaw=.58,pitch=.72,dragging=false,lastX=0,lastY=0,renderLast=0,prev=0,saveTime=0;
-const keys=new Set();const targetLook=new THREE.Vector3(), cameraGoal=new THREE.Vector3();
+let y=0,vertical=0,playing=false,started=false,jumping=false,eatUntil=0,holdClip='Eat',thoughtTimer,captionTimer,quest='',visitorTimer=0,visitorActive=false,noiseTarget=null,threatCooldown=0,lightingTimer=0,broadcastTimer=0;let yaw=.58,pitch=.72,cameraDistance=5.3,dragging=false,lastX=0,lastY=0,renderLast=0,prev=0,saveTime=0;
+const keys=new Set();const targetLook=new THREE.Vector3(), cameraGoal=new THREE.Vector3(),cameraRay=new THREE.Raycaster(),cameraDirection=new THREE.Vector3();
+const cameraWalls=[leftWall,rightWall,backWall,frontLeft,frontRight,windowLower,windowUpper,...cameraFurniture];
 function say(text,ms=4500){$('thought').textContent=text;$('thought').classList.add('show');clearTimeout(thoughtTimer);thoughtTimer=setTimeout(()=>$('thought').classList.remove('show'),ms)}
 function save(){state.x=catRoot.position.x;state.z=catRoot.position.z;try{localStorage.setItem(SAVE,JSON.stringify(state))}catch{}}
 function questUI(){const q=guidance(state);if(quest!==q[0]){quest=q[0];$('quest-title').textContent=q[0];$('quest-copy').textContent=q[1];$('quest-index').textContent='✳';$('quest-category').textContent='A NORTH KOLKATA MORNING'}
@@ -157,9 +150,9 @@ function interact(){if(!playing||state.hidden)return;const item=nearby();if(!ite
  if(item.type==='door')say('It won’t budge. The window smells like outside.');if(item.type==='window')say('A familiar way out. Jump up and through.');questUI();save()}
 // The light colors follow the Unity prototype's day/evening/night ramps.
 function sampleRamp(hour,keys){let h=hour;if(h<keys[0][0])h+=24;for(let i=0;i<keys.length-1;i++){const a=keys[i],b=keys[i+1];if(h<=b[0]){const t=THREE.MathUtils.clamp((h-a[0])/(b[0]-a[0]),0,1);return new THREE.Color(a[1]).lerp(new THREE.Color(b[1]),t)}}return new THREE.Color(keys[keys.length-1][1])}
-function updateLighting(){const h=state.hour;const fog=sampleRamp(h,[[0,0x0a0b12],[6,0x9999a5],[10,0xbdc4cc],[16.5,0xb3b3b5],[18.5,0x8f8080],[19.7,0x4d4a5c],[20.6,0x12141f],[24,0x0a0b12]]);scene.background.copy(fog);scene.fog.color.copy(fog);
+function updateLighting(){const h=state.hour;const fog=sampleRamp(h,[[0,0x0a0b12],[6,0x9999a5],[10,0xbdc4cc],[16.5,0xb3b3b5],[18.5,0x8f8080],[19.7,0x4d4a5c],[20.6,0x12141f],[24,0x0a0b12]]);fog.multiplyScalar(.68);scene.background.copy(fog);scene.fog.color.copy(fog);
  sun.color.copy(sampleRamp(h,[[0,0x292f50],[6,0xffbf8c],[9,0xfff2e0],[16.5,0xffe0b8],[18.5,0xffa86b],[19.7,0xd96b4d],[20.4,0x4d577f],[24,0x292f50]]));
- const dark=period(state)==='night'||state.inDark;sun.intensity=dark?.24:1.45;ambient.intensity=dark?.55:1.8;ambient.color.set(dark?0x56627f:0xffeed7);ambient.groundColor.set(dark?0x252b3a:0x778576)}
+ const dark=period(state)==='night'||state.inDark;sun.intensity=dark?.18:.72;ambient.intensity=dark?.42:.92;ambient.color.set(dark?0x56627f:0xffeed7);ambient.groundColor.set(dark?0x252b3a:0x778576)}
 function toggleHiding(){const nearBed=catRoot.position.z>-4&&Math.hypot(catRoot.position.x+3,catRoot.position.z-2.2)<2.4;if(!state.hidden&&!nearBed){say('There might be room under the bed.');return}state.hidden=!state.hidden;catRoot.visible=!state.hidden;$('shell').classList.toggle('hiding',state.hidden);if(state.hidden){state.dangerLearned=state.dangerLearned||visitorActive;say('Small. Dark. Quiet.')}else say('Carefully, back out.');save()}
 function emitNoise(radius,kind='other',origin=catRoot.position){if(state.hidden&&kind==='meow'){say('Best to stay quiet here.');return}noiseTarget={x:origin.x,z:origin.z,life:8,radius:radius*(period(state)==='night'?1.5:1)};if(visitorActive){visitorTimer=Math.max(0,visitorTimer-5);say('The scratching at the window gets louder.')}if(kind==='meow'&&typeof AudioContext!=='undefined'){try{const ac=new AudioContext(),osc=ac.createOscillator(),gain=ac.createGain();osc.type='sine';osc.frequency.setValueAtTime(580,ac.currentTime);osc.frequency.exponentialRampToValueAtTime(360,ac.currentTime+.18);gain.gain.setValueAtTime(.025,ac.currentTime);gain.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+.22);osc.connect(gain);gain.connect(ac.destination);osc.start();osc.stop(ac.currentTime+.23);osc.onended=()=>ac.close()}catch{}}}
 function updateThreats(dt){
@@ -181,13 +174,17 @@ function updateThreats(dt){
 let noiseHintShown=false;function sayOnceNoise(){if(!noiseHintShown){noiseHintShown=true;say('The sound brought it closer.',5000)}}
 function animate(name,force=false){if(currentAction===name&&!force)return;let next=actions[name]||actions.Idle;if(!next)return;const previous=actions[currentAction];if(previous&&previous!==next)previous.fadeOut(.18);next.reset().fadeIn(.18).play();currentAction=name}
 new GLTFLoader().load('./assets/kitten.glb',gltf=>{const model=gltf.scene;catRoot.add(model);model.updateMatrixWorld(true);const bounds=new THREE.Box3().setFromObject(model),size=new THREE.Vector3();bounds.getSize(size);const scale=.64/Math.max(size.y,.001);model.scale.setScalar(scale);model.updateMatrixWorld(true);const fitted=new THREE.Box3().setFromObject(model);model.position.y-=fitted.min.y;model.position.x-=(fitted.min.x+fitted.max.x)/2;model.position.z-=(fitted.min.z+fitted.max.z)/2;modelHeight=.64;model.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false}});mixer=new THREE.AnimationMixer(model);for(const clip of gltf.animations){if(clip.name==='Jump')clip.tracks=clip.tracks.filter(t=>!t.name.endsWith('Hips.position'));actions[clip.name]=mixer.clipAction(clip);if(['Jump','LieDown','WakeUp'].includes(clip.name)){actions[clip.name].setLoop(THREE.LoopOnce,1);actions[clip.name].clampWhenFinished=true}}animate('Idle');catRoot.position.set(state.x,0,state.z);questUI();updateLighting();$('loading').hidden=true;$('start-btn').disabled=false;$('start-btn').innerHTML='Begin the morning <span>↗</span>';renderOnce();},undefined,error=>{$('loading-detail').textContent='The kitten could not be loaded. Please reload the page.';console.error(error)});
-function wallVisibility(){const inside=catRoot.position.z>-4;backWall.visible=!(inside&&camera.position.z>3.65);leftWall.visible=!(inside&&camera.position.x< -4.3);rightWall.visible=!(inside&&camera.position.x>4.3)}
-function renderOnce(){camera.position.set(catRoot.position.x+5,5.3,catRoot.position.z+7);camera.lookAt(catRoot.position.x,.45,catRoot.position.z);wallVisibility();renderer.render(scene,camera)}
+// Keep the walls opaque. Move the camera to the near side of a wall when needed.
+function placeCamera(target,desired,dt=1){cameraDirection.subVectors(desired,target);const distance=cameraDirection.length();if(distance>.001){cameraDirection.divideScalar(distance);cameraRay.set(target,cameraDirection);cameraRay.far=distance;const hits=cameraRay.intersectObjects(cameraWalls,false);if(hits.length)desired.copy(target).addScaledVector(cameraDirection,Math.max(.18,hits[0].distance-.12))}camera.position.lerp(desired,Math.min(1,dt*9));camera.lookAt(target)}
+function renderOnce(){targetLook.set(catRoot.position.x,.5,catRoot.position.z);cameraGoal.set(targetLook.x+Math.sin(yaw)*Math.cos(pitch)*cameraDistance,targetLook.y+Math.sin(pitch)*cameraDistance,targetLook.z+Math.cos(yaw)*Math.cos(pitch)*cameraDistance);scene.updateMatrixWorld(true);camera.position.copy(targetLook);placeCamera(targetLook,cameraGoal,1);renderer.render(scene,camera)}
 function pause(){if(!started)return;playing=false;keys.clear();$('pause').hidden=false;save()}
 function resume(){if(!started)return;$('pause').hidden=true;playing=true;prev=performance.now();renderLast=0;requestAnimationFrame(frame)}
 $('start-btn').onclick=()=>{started=true;if(state.day===1&&state.nightWarning&&!state.visitorDone)startVisitor();$('start').hidden=true;$('shell').hidden=false;playing=true;prev=performance.now();requestAnimationFrame(frame);say(state.owner?'The house is still quiet.':'A familiar morning. But something feels different.')};$('pause-btn').onclick=pause;$('help-btn').onclick=pause;$('resume-btn').onclick=resume;
 $('reset-btn').onclick=()=>{try{localStorage.removeItem(SAVE)}catch{}location.reload()};
 addEventListener('keydown',e=>{if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();if(e.code==='Escape'){if(playing)pause();else if(started)resume();return}if(e.repeat)return;keys.add(e.code);if(e.code==='KeyE')interact();if(e.code==='KeyM'&&playing){say('Mrrrow.');emitNoise(7,'meow')}if(e.code==='KeyH'&&playing)toggleHiding();if(e.code==='Space'&&playing&&!state.hidden&&!jumping&&performance.now()>eatUntil){jumping=true;vertical=4.5;animate('Jump',true)}});addEventListener('keyup',e=>keys.delete(e.code));
+function zoom(amount){cameraDistance=THREE.MathUtils.clamp(cameraDistance+amount,1.5,8)}
+renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();zoom(e.deltaY*.004)},{passive:false});
+$('zoom-in').onclick=()=>zoom(-.7);$('zoom-out').onclick=()=>zoom(.7);
 renderer.domElement.addEventListener('pointerdown',e=>{if(playing){dragging=true;lastX=e.clientX;lastY=e.clientY;renderer.domElement.setPointerCapture(e.pointerId)}});renderer.domElement.addEventListener('pointermove',e=>{if(!dragging)return;yaw-=(e.clientX-lastX)*.006;pitch=THREE.MathUtils.clamp(pitch+(e.clientY-lastY)*.004,.35,1.1);lastX=e.clientX;lastY=e.clientY});renderer.domElement.addEventListener('pointerup',()=>dragging=false);addEventListener('blur',()=>{if(playing)pause()});document.addEventListener('visibilitychange',()=>{if(document.hidden&&playing)pause()});addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(devicePixelRatio||1,1));renderer.setSize(innerWidth,innerHeight);if(!playing&&mixer)renderOnce()});
 function validPosition(x,z,height){if(state.inDark){if(x<20.4||x>27.6||z< -19.1||z> -12.65)return false;if(x>24.1&&x<25.9&&z> -16.9&&z< -15.7)return false;return true}if(x< -13||x>13||z< -20||z>3.8)return false;const wasInside=catRoot.position.z> -4;const isInside=z> -4;
  if(wasInside!==isInside){if(!(x> -3.58&&x< -2.83&&height>.61&&height<1.38))return false}
@@ -195,14 +192,17 @@ function validPosition(x,z,height){if(state.inDark){if(x<20.4||x>27.6||z< -19.1|
  // Building fronts are solid; the neighbour is entered through its doorway interaction.
  if(!isInside&&z< -12.28&&x> -10.05&&x<9.7)return false;
  if(!isInside&&((x>3.3&&x<4.3&&z> -5.85&&z< -5.0)||(x>4.5&&x<5.5&&z> -7.7&&z< -6.7)||(x>9.75&&x<12.0&&z> -12.95&&z< -11.8)))return false;
- // Furniture blocks the full body even while jumping. The window stays usable.
- if(isInside&&insideFurniture(x,z))return false;
+ // Furniture blocks the cat at the side and supports it when jumping onto the top.
+ if(isInside&&blocksFurniture(x,z,height))return false;
  return true}
 function frame(now){if(!playing)return;requestAnimationFrame(frame);if(now-renderLast<1000/24)return;const dt=Math.min((now-prev)/1000,.08);prev=now;renderLast=now;
  let a=(keys.has('KeyD')||keys.has('ArrowRight')?1:0)-(keys.has('KeyA')||keys.has('ArrowLeft')?1:0);let b=(keys.has('KeyW')||keys.has('ArrowUp')?1:0)-(keys.has('KeyS')||keys.has('ArrowDown')?1:0);let move=new THREE.Vector3();if(performance.now()>eatUntil&&!state.hidden){const forward=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw)),right=new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));move.addScaledVector(forward,b).addScaledVector(right,a);if(move.lengthSq()>0)move.normalize()}
  const running=keys.has('ShiftLeft')||keys.has('ShiftRight');const speed=running?2.8:1.55;const beforeX=catRoot.position.x,beforeZ=catRoot.position.z;let nx=catRoot.position.x+move.x*speed*dt,nz=catRoot.position.z+move.z*speed*dt;if(validPosition(nx,catRoot.position.z,y))catRoot.position.x=nx;if(validPosition(catRoot.position.x,nz,y))catRoot.position.z=nz;
  if(move.lengthSq()>.001){const target=Math.atan2(move.x,move.z);let diff=Math.atan2(Math.sin(target-catRoot.rotation.y),Math.cos(target-catRoot.rotation.y));catRoot.rotation.y+=diff*Math.min(1,dt*9)}
- if(jumping){vertical-=11*dt;y+=vertical*dt;if(y<=0){y=0;vertical=0;jumping=false}}catRoot.position.y=y;
+ const ground=state.inDark?0:(catRoot.position.z> -4?supportHeight(catRoot.position.x,catRoot.position.z):0);
+ if(!jumping&&y>ground+.02){jumping=true;vertical=0}
+ if(jumping){const next=stepVertical(y,vertical,ground,dt);y=next.y;vertical=next.velocity;if(next.landed)jumping=false}
+ catRoot.position.y=y;
  const moved=Math.hypot(catRoot.position.x-beforeX,catRoot.position.z-beforeZ)>.001;
  if(!jumping){if(performance.now()<eatUntil)animate(holdClip);else if(moved)animate(running?'Run':'Walk');else animate('Idle')}
  if(mixer)mixer.update(dt);state.food=Math.max(0,state.food-dt*.025);state.water=Math.max(0,state.water-dt*.035);
@@ -214,4 +214,4 @@ function frame(now){if(!playing)return;requestAnimationFrame(frame);if(now-rende
  if(!state.inDark&&state.outside&&catRoot.position.z> -4&&!state.returnedHome){state.returnedHome=true;say('Home. It still smells familiar.')}
  if(!state.inDark&&!state.outside&&catRoot.position.z< -4.4){state.outside=true;say('No footsteps. No voices. Where did everybody go?',6000)}
  const item=nearby();$('prompt').hidden=!item||jumping||state.hidden;$('prompt-text').textContent=item?itemLabel(item):'';questUI();
- targetLook.set(catRoot.position.x,.5+y*.3,catRoot.position.z);const dist=5.3;cameraGoal.set(targetLook.x+Math.sin(yaw)*Math.cos(pitch)*dist,targetLook.y+Math.sin(pitch)*dist,targetLook.z+Math.cos(yaw)*Math.cos(pitch)*dist);camera.position.lerp(cameraGoal,Math.min(1,dt*5));camera.lookAt(targetLook);wallVisibility();renderer.render(scene,camera);if(now-saveTime>5000){saveTime=now;save()}}
+ targetLook.set(catRoot.position.x,.5+y,catRoot.position.z);const dist=cameraDistance;cameraGoal.set(targetLook.x+Math.sin(yaw)*Math.cos(pitch)*dist,targetLook.y+Math.sin(pitch)*dist,targetLook.z+Math.cos(yaw)*Math.cos(pitch)*dist);placeCamera(targetLook,cameraGoal,dt);renderer.render(scene,camera);if(now-saveTime>5000){saveTime=now;save()}}
