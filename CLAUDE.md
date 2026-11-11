@@ -1,0 +1,3 @@
+# Working on Nobody’s Home
+
+Read README.md first. This repository is the browser prototype; leave the separate Unity project untouched unless the owner asks. Use `dist/assets/kitten.glb` for the existing kitten, preserve saved progress and avoid replacing working systems. Maintain the older North Kolkata setting, low-power defaults and story told from a cat's perspective. The owner wants functionality and collision/camera reliability before visual polish, and no day-number countdown presentation. Run the three lightweight checks listed in README.md. Ask before running long graphical tests if the laptop is hot. Do not publish or change access without the owner's request.
