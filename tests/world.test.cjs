@@ -1,0 +1,11 @@
+const fs=require('node:fs'), vm=require('node:vm'), assert=require('node:assert/strict');
+const text=fs.readFileSync('dist/game.js','utf8');
+const furniture=text.slice(text.indexOf('const catRadius='),text.indexOf('const catRoot='));
+const collision=text.slice(text.indexOf('function validPosition('),text.indexOf('function frame('));
+const ctx={state:{inDark:false},catRoot:{position:{z:.3}}};vm.createContext(ctx);vm.runInContext(furniture+'\n'+collision+'\nthis.valid=validPosition;this.furniture=insideFurniture;',ctx);
+assert.equal(ctx.valid(-3,2,0),false,'bed blocks walking');assert.equal(ctx.valid(-3,2,1),false,'bed blocks jumps until climbing exists');
+assert.equal(ctx.valid(0,.4,0),false,'sofa is solid');assert.equal(ctx.valid(-3.2,-3.9,0),true,'window approach remains clear');
+ctx.catRoot.position.z=-3.99;assert.equal(ctx.valid(-3.2,-4.05,0),false,'closed wall blocks on floor');assert.equal(ctx.valid(-3.2,-4.05,.8),true,'open window can be crossed by jumping');
+ctx.catRoot.position.z=-4.1;assert.equal(ctx.valid(-3.2,-3.95,.8),true,'window can be crossed on the way home');
+ctx.state.inDark=true;assert.equal(ctx.valid(24,-13.5,0),true,'dark-house entry is walkable');assert.equal(ctx.valid(25,-16.3,0),false,'dark-house table is solid');assert.equal(ctx.valid(29,-16,0),false,'dark-house bounds are solid');
+console.log('Furniture, window both ways, street boundaries and dark-house collision checks passed.');

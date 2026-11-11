@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { normaliseState,advanceTime,period,takeResource,sleep,guidance } from './story.mjs';
 
 const $ = id => document.getElementById(id);
 const SAVE='nobodys-home-web-first-morning-v1';
@@ -7,7 +8,7 @@ const scene=new THREE.Scene(); scene.background=new THREE.Color(0xb8c9bc); scene
 const camera=new THREE.PerspectiveCamera(42,innerWidth/innerHeight,.05,100);
 const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'low-power',alpha:false});
 renderer.setPixelRatio(Math.min(devicePixelRatio||1,1)); renderer.setSize(innerWidth,innerHeight); renderer.outputColorSpace=THREE.SRGBColorSpace; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.1; $('game').appendChild(renderer.domElement);
-scene.add(new THREE.HemisphereLight(0xf7edce,0x667d6f,2.1)); const sun=new THREE.DirectionalLight(0xffe8bb,2); sun.position.set(-5,10,6); scene.add(sun);
+const ambient=new THREE.HemisphereLight(0xf7edce,0x667d6f,2.1); scene.add(ambient); const sun=new THREE.DirectionalLight(0xffe8bb,2); sun.position.set(-5,10,6); scene.add(sun);
 const mats={}; const mat=(name,color,roughness=1)=>mats[name]??(mats[name]=new THREE.MeshStandardMaterial({color,roughness}));
 const M={floor:mat('floor',0x9e4e3c), plank:mat('plank',0x854237),wall:mat('wall',0xe1cfad),trim:mat('trim',0xf1ead7),dark:mat('dark',0x506359),wood:mat('wood',0x8d644b),cream:mat('cream',0xe7ddca),fabric:mat('fabric',0x8d9b85),pink:mat('pink',0xbd8e7c),bowl:mat('bowl',0x9eb3a1),water:mat('water',0x86aeb0,.3),food:mat('food',0x8c664f),grass:mat('grass',0x9eaf8b),road:mat('road',0x777c6d),pave:mat('pave',0xbeb9a6),leaf:mat('leaf',0x7d9872),trunk:mat('trunk',0x806b53),brick:mat('brick',0xb98c75),gold:mat('gold',0xd3af70),glass:mat('glass',0xb4d7cf)};
 const unitBox=new THREE.BoxGeometry(1,1,1), unitCylinder=new THREE.CylinderGeometry(1,1,1,12), unitSphere=new THREE.SphereGeometry(1,12,8);
@@ -43,8 +44,8 @@ box(-4.12,.42,.8,.55,.72,.55,M.wood);box(-4.12,.82,.8,.65,.09,.65,M.trim);cylind
 // Furniture remains in the same places as the previous prototype.
 box(.0,.012,.2,2.7,.02,1.8,M.fabric);box(-.35,.47,.35,1.65,.52,.65,M.fabric);box(-.35,.82,.64,1.65,.65,.18,M.fabric);box(-1.12,.65,.35,.18,.55,.75,M.fabric);box(.42,.65,.35,.18,.55,.75,M.fabric);
 box(1.25,.3,-.1,.95,.48,.65,M.wood);box(1.25,.57,-.1,1.08,.08,.75,M.trim);box(3.83,.45,-1.65,1.1,.9,.55,M.wood);box(3.8,1.13,-1.65,.16,.65,1.0,M.dark);box(3.69,1.14,-1.65,.03,.53,.86,M.glass);
-function bowl(x,z,contents){const b=cylinder(x,.07,z,.27,.12,M.bowl);cylinder(x,.135,z,.205,.026,contents);return b}
-bowl(2.75,1.85,M.food);bowl(3.48,1.85,M.water);box(3.1,.015,1.85,1.45,.03,.75,M.cream);
+function bowl(x,z,contents){const b=cylinder(x,.07,z,.27,.12,M.bowl);return {base:b,contents:cylinder(x,.135,z,.205,.026,contents)}}
+const homeFoodBowl=bowl(2.75,1.85,M.food),homeWaterBowl=bowl(3.48,1.85,M.water);box(3.1,.015,1.85,1.45,.03,.75,M.cream);
 // A little shared courtyard sits between the window and lane.
 box(0,-.14,-12,42,.2,24,M.grass);box(0,.005,-5.8,9,.04,3.5,courtyard);
 for(let x=-4.1;x<=4.1;x+=.7)for(let z=-7.2;z< -4.4;z+=.7)detail(x,.029,z,.66,.01,.66,(Math.floor((x+z)*10)%3===0)?M.pave:courtyard);
@@ -72,6 +73,13 @@ function oldHouse(x,z,colour,variant){
  for(let i=0;i<4;i++)detail(x-2.2+i*.13,.35+i*.11,z+1.41,.10,.025,.012,wallShadow);
 }
 oldHouse(-7.5,-13.75,fadedRose,0);oldHouse(-2.6,-13.75,sunwall,1);oldHouse(2.3,-13.75,teal,2);oldHouse(7.2,-13.75,M.wall,3);
+// Everyday props drawn from the Unity home: slippers, phone, laptop and shopping.
+box(-1.45,.045,2.8,.18,.09,.34,M.dark);box(-1.18,.045,2.87,.18,.09,.34,M.dark);
+box(1.2,.635,-.1,.32,.025,.22,iron);const laptop=box(1.2,.76,-.21,.32,.23,.025,iron);laptop.rotation.x=-.18;
+box(-4.12,.885,.8,.10,.025,.18,iron);
+// Outside resources are finite and their state is saved.
+box(8.7,.13,-8.55,.58,.24,.42,M.cream);const streetFoodVisual=ball(8.7,.27,-8.55,.16,.08,.14,M.food);
+const porchFoodBowl=bowl(-7.5,-11.95,M.food);
 // A small tea stall and everyday street objects, on the far side of the lane.
 box(10.9,.55,-12.38,2.0,1.1,.76,M.wood);box(10.9,1.14,-12.35,2.1,.1,.90,M.trim);box(10.9,2.15,-12.38,2.2,.12,.95,terracotta);
 for(let x=10.1;x<11.8;x+=.4)detail(x,1.22,-12.05,.10,.12,.10,M.cream);
@@ -80,6 +88,27 @@ function tree(x,z){cylinder(x,.9,z,.13,1.8,M.trunk);ball(x,2.2,z,.65,.75,.60,M.l
 // Fine overhead cables stay above the walkable space.
 for(let i=0;i<3;i++)box(0,3.95+i*.15,-8.8+i*.18,25,.018,.018,iron);
 flushDetails();
+// Lightweight temporary character silhouettes. They can be replaced with authored assets.
+function actorPart(group,geometry,material,x,y,z,sx,sy,sz){const p=new THREE.Mesh(geometry,material);p.position.set(x,y,z);p.scale.set(sx,sy,sz);group.add(p);return p}
+const dog=new THREE.Group();scene.add(dog);dog.position.set(4,0,-10.2);const dogFur=mat('dog fur',0x806345);
+actorPart(dog,unitBox,dogFur,0,.34,0,.65,.36,.95);actorPart(dog,unitBox,dogFur,0,.55,.49,.40,.38,.38);
+for(const x of [-.22,.22])for(const z of [-.30,.30])actorPart(dog,unitBox,dogFur,x,.14,z,.13,.28,.14);
+for(const x of [-.16,.16])actorPart(dog,unitBox,iron,x,.78,.48,.12,.19,.13);
+const infected=new THREE.Group();scene.add(infected);infected.position.set(-1,0,-10.6);infected.visible=false;
+const cloth=mat('infected clothes',0x535a55),skin=mat('infected skin',0x998f7d);
+actorPart(infected,unitBox,cloth,0,.98,0,.48,.70,.27);actorPart(infected,unitSphere,skin,0,1.53,0,.21,.25,.19);
+for(const x of [-.14,.14])actorPart(infected,unitBox,cloth,x,.28,0,.16,.56,.18);
+for(const x of [-.34,.34])actorPart(infected,unitBox,cloth,x,.93,0,.17,.55,.16);
+// A single lightweight line mesh for rain; it is hidden until the weather changes.
+const rainPositions=new Float32Array(120*6);const rainGeometry=new THREE.BufferGeometry();rainGeometry.setAttribute('position',new THREE.BufferAttribute(rainPositions,3));
+const rain=new THREE.LineSegments(rainGeometry,new THREE.LineBasicMaterial({color:0xb4c3c7,transparent:true,opacity:.28,depthWrite:false}));rain.visible=false;rain.frustumCulled=false;scene.add(rain);
+function updateRain(now){const active=state.day>=3&&state.hour>=15&&state.hour<22&&!state.inDark;rain.visible=active;if(!active)return;rain.position.set(catRoot.position.x,0,catRoot.position.z);for(let i=0;i<120;i++){const x=((i*71)%131)/10-6.5,z=((i*43)%127)/10-6.3,y=3-((now*.003+i*.219)%3);const j=i*6;rainPositions[j]=x;rainPositions[j+1]=y;rainPositions[j+2]=z;rainPositions[j+3]=x-.025;rainPositions[j+4]=y-.24;rainPositions[j+5]=z}rainGeometry.attributes.position.needsUpdate=true}
+// A modest dark neighbour's interior, kept away from the lane until entered.
+box(24,-.1,-16,8,.2,7,mat('dark floor',0x544438));box(20,1.5,-16,.15,3,7,mat('dark plaster',0x716c61));box(28,1.5,-16,.15,3,7,mat('dark plaster',0x716c61));box(24,1.5,-19.5,8,3,.15,mat('dark plaster',0x716c61));
+box(25,.45,-16.3,1.4,.9,.8,M.wood);box(25,.94,-16.3,1.5,.08,.9,M.cream);cylinder(25,1.01,-16.3,.23,.08,M.food);
+box(21.3,.2,-17.8,.8,.4,.7,M.dark);cylinder(22.0,.12,-14.6,.11,.24,M.cream);cylinder(22.28,.12,-14.6,.11,.24,M.cream);cylinder(22.15,.36,-14.6,.11,.24,M.cream);
+const darkInfected=infected.clone();scene.add(darkInfected);darkInfected.position.set(26,0,-18);darkInfected.visible=false;
+const darkFigure=infected.clone();scene.add(darkFigure);darkFigure.position.set(27.25,0,-18.6);darkFigure.visible=false;
 // Furniture is solid at every jump height until proper climbing is implemented.
 // The extra margin accounts for the width of the cat rather than treating it as a point.
 const catRadius=.16;
@@ -92,43 +121,97 @@ const solidFurniture=[
 ];
 function insideFurniture(x,z){return solidFurniture.some(o=>x>o.minX-catRadius&&x<o.maxX+catRadius&&z>o.minZ-catRadius&&z<o.maxZ+catRadius)}
 const catRoot=new THREE.Group();scene.add(catRoot);let mixer,actions={},currentAction='',modelHeight=.6;
-let state={x:-1.9,z:.3,food:55,water:62,owner:false,ate:false,drank:false,tv:false,outside:false};
-try{const loaded=JSON.parse(localStorage.getItem(SAVE));if(loaded&&typeof loaded.x==='number'&&Number.isFinite(loaded.x))state={...state,...loaded}}catch{}
-state.x=THREE.MathUtils.clamp(state.x,-12,12);state.z=THREE.MathUtils.clamp(state.z,-19,3.7);
+let state=normaliseState({x:-1.9,z:.3,food:55,water:62,owner:false,ate:false,drank:false,tv:false,outside:false});
+try{const loaded=JSON.parse(localStorage.getItem(SAVE));if(loaded&&typeof loaded.x==='number'&&Number.isFinite(loaded.x))state=normaliseState({...state,...loaded})}catch{}
+if(state.inDark){state.x=THREE.MathUtils.clamp(state.x,20.4,27.6);state.z=THREE.MathUtils.clamp(state.z,-19.1,-12.8)}else{state.x=THREE.MathUtils.clamp(state.x,-12,12);state.z=THREE.MathUtils.clamp(state.z,-19,3.7)}
 if(state.z> -4&&insideFurniture(state.x,state.z)){state.x=-1.9;state.z=.3}
-let y=0,vertical=0,playing=false,started=false,jumping=false,eatUntil=0,thoughtTimer,quest='';let yaw=.58,pitch=.72,dragging=false,lastX=0,lastY=0,renderLast=0,prev=0,saveTime=0;
+let y=0,vertical=0,playing=false,started=false,jumping=false,eatUntil=0,holdClip='Eat',thoughtTimer,captionTimer,quest='',visitorTimer=0,visitorActive=false,noiseTarget=null,threatCooldown=0,lightingTimer=0,broadcastTimer=0;let yaw=.58,pitch=.72,dragging=false,lastX=0,lastY=0,renderLast=0,prev=0,saveTime=0;
 const keys=new Set();const targetLook=new THREE.Vector3(), cameraGoal=new THREE.Vector3();
 function say(text,ms=4500){$('thought').textContent=text;$('thought').classList.add('show');clearTimeout(thoughtTimer);thoughtTimer=setTimeout(()=>$('thought').classList.remove('show'),ms)}
 function save(){state.x=catRoot.position.x;state.z=catRoot.position.z;try{localStorage.setItem(SAVE,JSON.stringify(state))}catch{}}
-function questUI(){let q;if(!state.owner)q=['Where is everyone?','The house is quiet. Look around for your person.','01','A NORTH KOLKATA MORNING'];else if(!state.ate)q=['Breakfast first','There’s still food where it always is.','02','A NORTH KOLKATA MORNING'];else if(!state.outside)q=['A little fresh air','The front door is shut. Perhaps the open window?','03','SOMETHING FEELS DIFFERENT'];else q=['The quiet street','There are places to explore, but nobody seems to be around.','04','OUTSIDE'];
-if(quest!==q[0]){quest=q[0];$('quest-title').textContent=q[0];$('quest-copy').textContent=q[1];$('quest-index').textContent=q[2];$('quest-category').textContent=q[3]};$('food-bar').style.width=state.food+'%';$('water-bar').style.width=state.water+'%'}
-const items=[{x:-3,z:2.2,r:2.3,label:'Look for your person',type:'bed'},{x:2.75,z:1.85,r:1.1,label:'Eat breakfast',type:'food'},{x:3.48,z:1.85,r:1.05,label:'Drink water',type:'water'},{x:3.8,z:-1.65,r:1.25,label:'Investigate the television',type:'tv'},{x:2.8,z:3.9,r:1.05,label:'Try the front door',type:'door'},{x:-3.2,z:-3.65,r:1.4,label:'Look at the open window',type:'window'}];
-function nearby(){let nearest=null,best=Infinity;for(const item of items){const d=Math.hypot(catRoot.position.x-item.x,catRoot.position.z-item.z);if(d<item.r&&d<best && !(catRoot.position.z< -4.3 && item.type!=='window')){nearest=item;best=d}}return nearest}
-function interact(){if(!playing)return;const item=nearby();if(!item)return;if(item.type==='bed'){state.owner=true;say('Their smell is here. Maybe they will be back soon.')}if(item.type==='food'){state.food=Math.min(100,state.food+35);state.ate=true;eatUntil=performance.now()+2300;say('Breakfast, just where it should be.')}if(item.type==='water'){state.water=Math.min(100,state.water+40);eatUntil=performance.now()+1800;say('A few quiet laps of water.')}if(item.type==='tv'){state.tv=true;say('The screen flickers. A voice crackles from somewhere inside.',5500)}if(item.type==='door')say('It won’t budge. The window smells like outside.');if(item.type==='window')say('A familiar way out. Jump up and through.');questUI();save()}
+function questUI(){const q=guidance(state);if(quest!==q[0]){quest=q[0];$('quest-title').textContent=q[0];$('quest-copy').textContent=q[1];$('quest-index').textContent='✳';$('quest-category').textContent='A NORTH KOLKATA MORNING'}
+ $('food-bar').style.width=state.food+'%';$('water-bar').style.width=state.water+'%';$('energy-bar').style.width=state.energy+'%';homeFoodBowl.contents.visible=state.homeFood>0;homeWaterBowl.contents.visible=state.homeWater>0;streetFoodVisual.visible=state.streetFood>0;porchFoodBowl.contents.visible=state.porchFood>0;$('period-label').textContent='NORTH KOLKATA · '+period(state).toUpperCase()}
+const items=[{x:-3,z:2.2,r:2.3,label:'Look for your person',type:'bed',zone:'home'},{x:2.75,z:1.85,r:1.1,label:'Eat breakfast',type:'food',zone:'home'},{x:3.48,z:1.85,r:1.05,label:'Drink water',type:'water',zone:'home'},{x:3.8,z:-1.65,r:1.25,label:'Investigate the television',type:'tv',zone:'home'},{x:2.8,z:3.9,r:1.05,label:'Try the front door',type:'door',zone:'home'},{x:-3.2,z:-3.65,r:1.4,label:'Look at the open window',type:'window'},{x:8.7,z:-8.55,r:1.15,label:'Investigate the dropped food',type:'streetFood',zone:'street'},{x:-7.5,z:-11.95,r:1.1,label:'Investigate the porch dish',type:'porchFood',zone:'street'},{x:3.8,z:-5.4,r:1.1,label:'Drink from the tap puddle',type:'streetWater',zone:'street'},{x:-2.6,z:-11.95,r:1.15,label:'Enter the quiet house',type:'enterHouse',zone:'street'},{x:10.9,z:-11.95,r:1.3,label:'Listen to the radio',type:'radio',zone:'street'},{x:24,z:-13.0,r:1.3,label:'Return to the lane',type:'exitHouse',zone:'dark'},{x:24.4,z:-16.3,r:1.5,label:'Investigate the food',type:'darkFood',zone:'dark'},{x:22.1,z:-14.6,r:1.05,label:'Nudge the tins',type:'tins',zone:'dark'},{x:26,z:-17.0,r:1.2,label:'Listen at the inner door',type:'innerDoor',zone:'dark'}];
+function nearby(){let nearest=null,best=Infinity;for(const item of items){if(state.inDark&&item.zone!=='dark')continue;if(!state.inDark&&item.zone==='dark')continue;if(item.zone==='home'&&catRoot.position.z< -4.05)continue;if(item.zone==='street'&&catRoot.position.z> -4.05)continue;const d=Math.hypot(catRoot.position.x-item.x,catRoot.position.z-item.z);if(d<item.r&&d<best){nearest=item;best=d}}return nearest}
+function itemLabel(item){if(item.type==='bed'&&state.owner)return 'Rest by the bed';if(item.type==='food'&&state.homeFood<=0)return 'Inspect the empty bowl';if(item.type==='water'&&state.homeWater<=0)return 'Inspect the empty water bowl';if(['streetFood','porchFood','streetWater','darkFood'].includes(item.type)&&state[item.type]<=0)return 'Nothing left here';return item.label}
+function caption(text,ms=6500){$('caption').textContent=text;$('caption').hidden=false;clearTimeout(captionTimer);captionTimer=setTimeout(()=>$('caption').hidden=true,ms)}
+function startVisitor(){if(visitorActive||state.visitorDone)return;visitorActive=true;visitorTimer=0;state.visitorSeen=true;infected.position.set(-3.2,0,-5.2);infected.visible=true;say('A noise at the window. Someone is outside.',6000)}
+function onDawn(){if(state.day>=3&&state.tv){state.tv=false;say('The television has gone quiet.')}state.food=Math.max(0,state.food-12);state.water=Math.max(0,state.water-10);if(state.day===2)say('The bowl is empty. Still no one.',6000);else say('Another quiet morning.',4500);save()}
+function interact(){if(!playing||state.hidden)return;const item=nearby();if(!item)return;
+ if(item.type==='bed'){
+  if(!state.owner){state.owner=true;say('Their smell is here. Maybe they will be back soon.')}
+  else if(visitorActive)say('Too much noise outside. Find a quiet place.');
+  else {const result=sleep(state,true);if(!result.ok)say(result.reason);else if(result.event==='visitor'){holdClip='Sleep';animate('Sleep',true);eatUntil=performance.now()+1400;startVisitor()}else{holdClip='WakeUp';animate('WakeUp',true);eatUntil=performance.now()+1200;onDawn();if(result.event==='chapter')say('They have not come back.',7000)}}
+ }
+ if(item.type==='food'){if(takeResource(state,'homeFood')){state.food=Math.min(100,state.food+35);state.ate=true;holdClip='Eat';eatUntil=performance.now()+2300;say('Breakfast, just where it should be.')}else say('Empty. The familiar bowl has nothing left.')}
+ if(item.type==='water'){if(takeResource(state,'homeWater')){state.water=Math.min(100,state.water+35);state.drank=true;holdClip='Eat';eatUntil=performance.now()+1800;say('A few quiet laps of water.')}else say('The water bowl is dry.')}
+ if(item.type==='streetFood'||item.type==='porchFood'||item.type==='darkFood'){if(takeResource(state,item.type)){state.food=Math.min(100,state.food+30);holdClip='Eat';eatUntil=performance.now()+2300;say('A little food. Enough for now.')}else say('Nothing left to eat here.')}
+ if(item.type==='streetWater'){if(takeResource(state,'streetWater')){state.water=Math.min(100,state.water+30);holdClip='Eat';eatUntil=performance.now()+1800;say('Water, cool against the ground.')}else say('The puddle has dried up.')}
+ if(item.type==='tv'&&state.day>=3){state.tv=false;say('The screen stays dark.');}
+ else if(item.type==='tv'){state.tv=!state.tv;if(state.tv){caption('NEWS: Residents are urged to remain indoors. Avoid contact with anyone showing unusual behaviour.');say('A voice crackles from the television.');emitNoise(4)}else say('The television falls quiet.')}
+ if(item.type==='enterHouse'){state.inDark=true;state.visitedDark=true;catRoot.position.set(24,0,-13.5);y=vertical=0;jumping=false;say('It is dark here. Something moves beyond the door.',6000);updateLighting()}
+ if(item.type==='exitHouse'){state.inDark=false;catRoot.position.set(-2.6,0,-11.0);y=vertical=0;jumping=false;say('Back in the lane.');updateLighting()}
+ if(item.type==='tins'){state.darkAwake=true;state.noiseLesson=true;emitNoise(7);say('The tins clatter across the floor.',5000)}
+ if(item.type==='innerDoor'){state.seenInfected=true;say('A thump. A shape behind the door.',5000)}
+ if(item.type==='radio'){state.radioHeard=true;caption('RADIO: Stay away from the infected. Keep your doors locked and remain inside.');say('A voice from the little radio.');emitNoise(4)}
+ if(item.type==='door')say('It won’t budge. The window smells like outside.');if(item.type==='window')say('A familiar way out. Jump up and through.');questUI();save()}
+// The light colors follow the Unity prototype's day/evening/night ramps.
+function sampleRamp(hour,keys){let h=hour;if(h<keys[0][0])h+=24;for(let i=0;i<keys.length-1;i++){const a=keys[i],b=keys[i+1];if(h<=b[0]){const t=THREE.MathUtils.clamp((h-a[0])/(b[0]-a[0]),0,1);return new THREE.Color(a[1]).lerp(new THREE.Color(b[1]),t)}}return new THREE.Color(keys[keys.length-1][1])}
+function updateLighting(){const h=state.hour;const fog=sampleRamp(h,[[0,0x0a0b12],[6,0x9999a5],[10,0xbdc4cc],[16.5,0xb3b3b5],[18.5,0x8f8080],[19.7,0x4d4a5c],[20.6,0x12141f],[24,0x0a0b12]]);scene.background.copy(fog);scene.fog.color.copy(fog);
+ sun.color.copy(sampleRamp(h,[[0,0x292f50],[6,0xffbf8c],[9,0xfff2e0],[16.5,0xffe0b8],[18.5,0xffa86b],[19.7,0xd96b4d],[20.4,0x4d577f],[24,0x292f50]]));
+ const dark=period(state)==='night'||state.inDark;sun.intensity=dark?.24:1.45;ambient.intensity=dark?.55:1.8;ambient.color.set(dark?0x56627f:0xffeed7);ambient.groundColor.set(dark?0x252b3a:0x778576)}
+function toggleHiding(){const nearBed=catRoot.position.z>-4&&Math.hypot(catRoot.position.x+3,catRoot.position.z-2.2)<2.4;if(!state.hidden&&!nearBed){say('There might be room under the bed.');return}state.hidden=!state.hidden;catRoot.visible=!state.hidden;$('shell').classList.toggle('hiding',state.hidden);if(state.hidden){state.dangerLearned=state.dangerLearned||visitorActive;say('Small. Dark. Quiet.')}else say('Carefully, back out.');save()}
+function emitNoise(radius,kind='other',origin=catRoot.position){if(state.hidden&&kind==='meow'){say('Best to stay quiet here.');return}noiseTarget={x:origin.x,z:origin.z,life:8,radius:radius*(period(state)==='night'?1.5:1)};if(visitorActive){visitorTimer=Math.max(0,visitorTimer-5);say('The scratching at the window gets louder.')}if(kind==='meow'&&typeof AudioContext!=='undefined'){try{const ac=new AudioContext(),osc=ac.createOscillator(),gain=ac.createGain();osc.type='sine';osc.frequency.setValueAtTime(580,ac.currentTime);osc.frequency.exponentialRampToValueAtTime(360,ac.currentTime+.18);gain.gain.setValueAtTime(.025,ac.currentTime);gain.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+.22);osc.connect(gain);gain.connect(ac.destination);osc.start();osc.stop(ac.currentTime+.23);osc.onended=()=>ac.close()}catch{}}}
+function updateThreats(dt){
+ darkInfected.visible=state.inDark;darkFigure.visible=state.inDark;darkInfected.rotation.z=state.darkAwake?0:.65;
+ if(threatCooldown>0)threatCooldown-=dt;if(noiseTarget){noiseTarget.life-=dt;if(noiseTarget.life<=0)noiseTarget=null}
+ if(visitorActive){visitorTimer+=dt;infected.visible=true;infected.position.set(-3.2,0,-5.05);infected.rotation.y=Math.sin(visitorTimer*1.5)*.16;
+  if(visitorTimer>28){visitorActive=false;state.visitorDone=true;state.nightWarning=false;state.dangerLearned=true;infected.visible=state.day>=2;infected.position.set(-1,0,-10.6);say('The sounds fade away. Quiet again.',5000);save()}}
+ else infected.visible=state.day>=2;
+ const outside=catRoot.position.z< -4.08&&!state.inDark;
+ function chase(actor,range,speed,isInfected){let dx=catRoot.position.x-actor.position.x,dz=catRoot.position.z-actor.position.z,dist=Math.hypot(dx,dz);let alert=outside&&!state.hidden&&dist<range;
+  if(noiseTarget&&Math.hypot(noiseTarget.x-actor.position.x,noiseTarget.z-actor.position.z)<noiseTarget.radius){if(isInfected){state.noiseLesson=true;sayOnceNoise()}if(!alert){dx=noiseTarget.x-actor.position.x;dz=noiseTarget.z-actor.position.z;dist=Math.hypot(dx,dz);alert=true}}
+  if(alert&&dist>.6){actor.position.x+=dx/dist*speed*dt;actor.position.z+=dz/dist*speed*dt;actor.position.z=Math.min(-4.35,actor.position.z);actor.rotation.y=Math.atan2(dx,dz)}
+  if(alert&&outside&&!state.hidden&&dist<.62&&threatCooldown<=0){threatCooldown=5;state.dangerLearned=true;catRoot.position.set(-1.9,0,.3);y=vertical=0;jumping=false;noiseTarget=null;say(isInfected?'Hands. Not that way.':'Teeth. Not that way.',5000);save()}}
+ if(!visitorActive){if(state.day>=2){chase(infected,3.5,.9,true);if(outside&&Math.hypot(infected.position.x-catRoot.position.x,infected.position.z-catRoot.position.z)<5)state.seenInfected=true}}
+ chase(dog,3.3,1.25,false);
+ if(state.inDark&&state.darkAwake&&!state.hidden){const dx=catRoot.position.x-darkInfected.position.x,dz=catRoot.position.z-darkInfected.position.z,d=Math.hypot(dx,dz);if(d>.6){darkInfected.position.x+=dx/d*.65*dt;darkInfected.position.z+=dz/d*.65*dt;darkInfected.rotation.y=Math.atan2(dx,dz)}if(d<.7&&threatCooldown<=0){state.inDark=false;state.dangerLearned=true;state.noiseLesson=true;catRoot.position.set(-2.6,0,-11);threatCooldown=5;updateLighting();say('Hands. Back outside.',5000);save()}}
+ 
+}
+let noiseHintShown=false;function sayOnceNoise(){if(!noiseHintShown){noiseHintShown=true;say('The sound brought it closer.',5000)}}
 function animate(name,force=false){if(currentAction===name&&!force)return;let next=actions[name]||actions.Idle;if(!next)return;const previous=actions[currentAction];if(previous&&previous!==next)previous.fadeOut(.18);next.reset().fadeIn(.18).play();currentAction=name}
-new GLTFLoader().load('./assets/kitten.glb',gltf=>{const model=gltf.scene;catRoot.add(model);model.updateMatrixWorld(true);const bounds=new THREE.Box3().setFromObject(model),size=new THREE.Vector3();bounds.getSize(size);const scale=.64/Math.max(size.y,.001);model.scale.setScalar(scale);model.updateMatrixWorld(true);const fitted=new THREE.Box3().setFromObject(model);model.position.y-=fitted.min.y;model.position.x-=(fitted.min.x+fitted.max.x)/2;model.position.z-=(fitted.min.z+fitted.max.z)/2;modelHeight=.64;model.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false}});mixer=new THREE.AnimationMixer(model);for(const clip of gltf.animations){actions[clip.name]=mixer.clipAction(clip);if(['Jump','LieDown','WakeUp'].includes(clip.name)){actions[clip.name].setLoop(THREE.LoopOnce,1);actions[clip.name].clampWhenFinished=true}}animate('Idle');catRoot.position.set(state.x,0,state.z);questUI();$('loading').hidden=true;$('start-btn').disabled=false;$('start-btn').innerHTML='Begin the morning <span>↗</span>';renderOnce();},undefined,error=>{$('loading-detail').textContent='The kitten could not be loaded. Please reload the page.';console.error(error)});
+new GLTFLoader().load('./assets/kitten.glb',gltf=>{const model=gltf.scene;catRoot.add(model);model.updateMatrixWorld(true);const bounds=new THREE.Box3().setFromObject(model),size=new THREE.Vector3();bounds.getSize(size);const scale=.64/Math.max(size.y,.001);model.scale.setScalar(scale);model.updateMatrixWorld(true);const fitted=new THREE.Box3().setFromObject(model);model.position.y-=fitted.min.y;model.position.x-=(fitted.min.x+fitted.max.x)/2;model.position.z-=(fitted.min.z+fitted.max.z)/2;modelHeight=.64;model.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false}});mixer=new THREE.AnimationMixer(model);for(const clip of gltf.animations){if(clip.name==='Jump')clip.tracks=clip.tracks.filter(t=>!t.name.endsWith('Hips.position'));actions[clip.name]=mixer.clipAction(clip);if(['Jump','LieDown','WakeUp'].includes(clip.name)){actions[clip.name].setLoop(THREE.LoopOnce,1);actions[clip.name].clampWhenFinished=true}}animate('Idle');catRoot.position.set(state.x,0,state.z);questUI();updateLighting();$('loading').hidden=true;$('start-btn').disabled=false;$('start-btn').innerHTML='Begin the morning <span>↗</span>';renderOnce();},undefined,error=>{$('loading-detail').textContent='The kitten could not be loaded. Please reload the page.';console.error(error)});
 function wallVisibility(){const inside=catRoot.position.z>-4;backWall.visible=!(inside&&camera.position.z>3.65);leftWall.visible=!(inside&&camera.position.x< -4.3);rightWall.visible=!(inside&&camera.position.x>4.3)}
 function renderOnce(){camera.position.set(catRoot.position.x+5,5.3,catRoot.position.z+7);camera.lookAt(catRoot.position.x,.45,catRoot.position.z);wallVisibility();renderer.render(scene,camera)}
 function pause(){if(!started)return;playing=false;keys.clear();$('pause').hidden=false;save()}
 function resume(){if(!started)return;$('pause').hidden=true;playing=true;prev=performance.now();renderLast=0;requestAnimationFrame(frame)}
-$('start-btn').onclick=()=>{started=true;$('start').hidden=true;$('shell').hidden=false;playing=true;prev=performance.now();requestAnimationFrame(frame);say(state.owner?'The house is still quiet.':'A familiar morning. But something feels different.')};$('pause-btn').onclick=pause;$('help-btn').onclick=pause;$('resume-btn').onclick=resume;
+$('start-btn').onclick=()=>{started=true;if(state.day===1&&state.nightWarning&&!state.visitorDone)startVisitor();$('start').hidden=true;$('shell').hidden=false;playing=true;prev=performance.now();requestAnimationFrame(frame);say(state.owner?'The house is still quiet.':'A familiar morning. But something feels different.')};$('pause-btn').onclick=pause;$('help-btn').onclick=pause;$('resume-btn').onclick=resume;
 $('reset-btn').onclick=()=>{try{localStorage.removeItem(SAVE)}catch{}location.reload()};
-addEventListener('keydown',e=>{if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();if(e.code==='Escape'){if(playing)pause();else if(started)resume();return}if(e.repeat)return;keys.add(e.code);if(e.code==='KeyE')interact();if(e.code==='Space'&&playing&&!jumping&&performance.now()>eatUntil){jumping=true;vertical=4.5;animate('Jump',true)}});addEventListener('keyup',e=>keys.delete(e.code));
+addEventListener('keydown',e=>{if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();if(e.code==='Escape'){if(playing)pause();else if(started)resume();return}if(e.repeat)return;keys.add(e.code);if(e.code==='KeyE')interact();if(e.code==='KeyM'&&playing){say('Mrrrow.');emitNoise(7,'meow')}if(e.code==='KeyH'&&playing)toggleHiding();if(e.code==='Space'&&playing&&!state.hidden&&!jumping&&performance.now()>eatUntil){jumping=true;vertical=4.5;animate('Jump',true)}});addEventListener('keyup',e=>keys.delete(e.code));
 renderer.domElement.addEventListener('pointerdown',e=>{if(playing){dragging=true;lastX=e.clientX;lastY=e.clientY;renderer.domElement.setPointerCapture(e.pointerId)}});renderer.domElement.addEventListener('pointermove',e=>{if(!dragging)return;yaw-=(e.clientX-lastX)*.006;pitch=THREE.MathUtils.clamp(pitch+(e.clientY-lastY)*.004,.35,1.1);lastX=e.clientX;lastY=e.clientY});renderer.domElement.addEventListener('pointerup',()=>dragging=false);addEventListener('blur',()=>{if(playing)pause()});document.addEventListener('visibilitychange',()=>{if(document.hidden&&playing)pause()});addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(devicePixelRatio||1,1));renderer.setSize(innerWidth,innerHeight);if(!playing&&mixer)renderOnce()});
-function validPosition(x,z,height){if(x< -13||x>13||z< -20||z>3.8)return false;const wasInside=catRoot.position.z> -4;const isInside=z> -4;
+function validPosition(x,z,height){if(state.inDark){if(x<20.4||x>27.6||z< -19.1||z> -12.65)return false;if(x>24.1&&x<25.9&&z> -16.9&&z< -15.7)return false;return true}if(x< -13||x>13||z< -20||z>3.8)return false;const wasInside=catRoot.position.z> -4;const isInside=z> -4;
  if(wasInside!==isInside){if(!(x> -3.58&&x< -2.83&&height>.61&&height<1.38))return false}
  if(isInside&&(x< -4.36||x>4.36))return false;
+ // Building fronts are solid; the neighbour is entered through its doorway interaction.
+ if(!isInside&&z< -12.28&&x> -10.05&&x<9.7)return false;
+ if(!isInside&&((x>3.3&&x<4.3&&z> -5.85&&z< -5.0)||(x>4.5&&x<5.5&&z> -7.7&&z< -6.7)||(x>9.75&&x<12.0&&z> -12.95&&z< -11.8)))return false;
  // Furniture blocks the full body even while jumping. The window stays usable.
  if(isInside&&insideFurniture(x,z))return false;
  return true}
 function frame(now){if(!playing)return;requestAnimationFrame(frame);if(now-renderLast<1000/24)return;const dt=Math.min((now-prev)/1000,.08);prev=now;renderLast=now;
- let a=(keys.has('KeyD')||keys.has('ArrowRight')?1:0)-(keys.has('KeyA')||keys.has('ArrowLeft')?1:0);let b=(keys.has('KeyW')||keys.has('ArrowUp')?1:0)-(keys.has('KeyS')||keys.has('ArrowDown')?1:0);let move=new THREE.Vector3();if(performance.now()>eatUntil){const forward=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw)),right=new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));move.addScaledVector(forward,b).addScaledVector(right,a);if(move.lengthSq()>0)move.normalize()}
+ let a=(keys.has('KeyD')||keys.has('ArrowRight')?1:0)-(keys.has('KeyA')||keys.has('ArrowLeft')?1:0);let b=(keys.has('KeyW')||keys.has('ArrowUp')?1:0)-(keys.has('KeyS')||keys.has('ArrowDown')?1:0);let move=new THREE.Vector3();if(performance.now()>eatUntil&&!state.hidden){const forward=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw)),right=new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));move.addScaledVector(forward,b).addScaledVector(right,a);if(move.lengthSq()>0)move.normalize()}
  const running=keys.has('ShiftLeft')||keys.has('ShiftRight');const speed=running?2.8:1.55;const beforeX=catRoot.position.x,beforeZ=catRoot.position.z;let nx=catRoot.position.x+move.x*speed*dt,nz=catRoot.position.z+move.z*speed*dt;if(validPosition(nx,catRoot.position.z,y))catRoot.position.x=nx;if(validPosition(catRoot.position.x,nz,y))catRoot.position.z=nz;
  if(move.lengthSq()>.001){const target=Math.atan2(move.x,move.z);let diff=Math.atan2(Math.sin(target-catRoot.rotation.y),Math.cos(target-catRoot.rotation.y));catRoot.rotation.y+=diff*Math.min(1,dt*9)}
  if(jumping){vertical-=11*dt;y+=vertical*dt;if(y<=0){y=0;vertical=0;jumping=false}}catRoot.position.y=y;
  const moved=Math.hypot(catRoot.position.x-beforeX,catRoot.position.z-beforeZ)>.001;
- if(!jumping){if(performance.now()<eatUntil)animate('Eat');else if(moved)animate(running?'Run':'Walk');else animate('Idle')}
+ if(!jumping){if(performance.now()<eatUntil)animate(holdClip);else if(moved)animate(running?'Run':'Walk');else animate('Idle')}
  if(mixer)mixer.update(dt);state.food=Math.max(0,state.food-dt*.025);state.water=Math.max(0,state.water-dt*.035);
- if(!state.outside&&catRoot.position.z< -4.4){state.outside=true;say('No footsteps. No voices. Where did everybody go?',6000)}
- const item=nearby();$('prompt').hidden=!item||jumping;$('prompt-text').textContent=item?.label||'';questUI();
+ for(const event of advanceTime(state,dt)){if(event==='visitor')startVisitor();if(event==='dawn')onDawn()}
+ updateThreats(dt);updateRain(now);
+ if(state.tv&&state.day<3){broadcastTimer-=dt;if(broadcastTimer<=0){broadcastTimer=12;emitNoise(5,'broadcast',{x:3.8,z:-1.65})}}
+ if(rain.visible&&!state.rainNoticed){state.rainNoticed=true;say('Rain on the rooftops.',4500)}
+ lightingTimer-=dt;if(lightingTimer<=0){updateLighting();lightingTimer=2}
+ if(!state.inDark&&state.outside&&catRoot.position.z> -4&&!state.returnedHome){state.returnedHome=true;say('Home. It still smells familiar.')}
+ if(!state.inDark&&!state.outside&&catRoot.position.z< -4.4){state.outside=true;say('No footsteps. No voices. Where did everybody go?',6000)}
+ const item=nearby();$('prompt').hidden=!item||jumping||state.hidden;$('prompt-text').textContent=item?itemLabel(item):'';questUI();
  targetLook.set(catRoot.position.x,.5+y*.3,catRoot.position.z);const dist=5.3;cameraGoal.set(targetLook.x+Math.sin(yaw)*Math.cos(pitch)*dist,targetLook.y+Math.sin(pitch)*dist,targetLook.z+Math.cos(yaw)*Math.cos(pitch)*dist);camera.position.lerp(cameraGoal,Math.min(1,dt*5));camera.lookAt(targetLook);wallVisibility();renderer.render(scene,camera);if(now-saveTime>5000){saveTime=now;save()}}
