@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { normaliseState,advanceTime,period,takeResource,sleep,guidance,movementMultiplier } from './story.mjs';
-import { constrainCamera } from './camera.mjs';
+import { makeFollowCamera } from './follow-camera.mjs';
+import { bindMouseLook } from './mouse-look.mjs';
 import { makeThreat,stepThreat } from './threats.mjs';
 import { stepVertical } from './physics.mjs';
 import * as home from './home.mjs';
@@ -21,7 +22,7 @@ const mats={}; const mat=(name,color,roughness=1)=>mats[name]??(mats[name]=new T
 const M={floor:mat('floor',0x713e35), plank:mat('plank',0x854237),wall:mat('wall',0xe1cfad),trim:mat('trim',0xf1ead7),dark:mat('dark',0x506359),wood:mat('wood',0x8d644b),cream:mat('cream',0xe7ddca),fabric:mat('fabric',0x8d9b85),pink:mat('pink',0xbd8e7c),bowl:mat('bowl',0x9eb3a1),water:mat('water',0x86aeb0,.3),food:mat('food',0x8c664f),grass:mat('grass',0x9eaf8b),road:mat('road',0x777c6d),pave:mat('pave',0xbeb9a6),leaf:mat('leaf',0x7d9872),trunk:mat('trunk',0x806b53),brick:mat('brick',0xb98c75),gold:mat('gold',0xd3af70),glass:mat('glass',0xb4d7cf)};
 M.wall.side=THREE.DoubleSide;
 const unitBox=new THREE.BoxGeometry(1,1,1), unitCylinder=new THREE.CylinderGeometry(1,1,1,12), unitSphere=new THREE.SphereGeometry(1,12,8);
-const cameraFurniture=[],cameraBuildings=[];
+const cameraFurniture=[],cameraBuildings=[],cameraSolids=[...home.solids];
 function box(x,y,z,w,h,d,m){const mesh=new THREE.Mesh(unitBox,m);mesh.position.set(x,y,z);mesh.scale.set(w,h,d);mesh.receiveShadow=true;scene.add(mesh);if((m===M.fabric||m===M.wood)&&h>=.35&&x> -4.6&&x<4.6&&z> -4&&z<4)cameraFurniture.push(mesh);return mesh}
 function cylinder(x,y,z,r,h,m,r2=r){const mesh=new THREE.Mesh(unitCylinder,m);mesh.position.set(x,y,z);mesh.scale.set(r,h,r2);scene.add(mesh);return mesh}
 function ball(x,y,z,sx,sy,sz,m){const mesh=new THREE.Mesh(unitSphere,m);mesh.position.set(x,y,z);mesh.scale.set(sx,sy,sz);scene.add(mesh);return mesh}
@@ -74,7 +75,7 @@ new GLTFLoader().load('./assets/kolkata-houses.glb?v=weathered-2',gltf=>{
  // Camera obstacles follow the imported houses, including their actual heights.
  for(const house of row.children){
   const bounds=new THREE.Box3().setFromObject(house),size=new THREE.Vector3(),center=new THREE.Vector3();
-  bounds.getSize(size);bounds.getCenter(center);
+  bounds.getSize(size);bounds.getCenter(center);cameraSolids.push({minX:bounds.min.x,maxX:bounds.max.x,minZ:bounds.min.z,maxZ:bounds.max.z,bottom:bounds.min.y,top:bounds.max.y});
   const proxy=new THREE.Mesh(unitBox,M.wall);proxy.position.copy(center);proxy.scale.copy(size);proxy.visible=false;
   scene.add(proxy);cameraWalls.push(proxy);
  }
@@ -123,10 +124,12 @@ try{const loaded=JSON.parse(localStorage.getItem(SAVE));if(loaded&&typeof loaded
 home.migrate(state);
 if(state.inDark){state.x=THREE.MathUtils.clamp(state.x,20.4,27.6);state.z=THREE.MathUtils.clamp(state.z,-19.1,-12.8)}else{state.x=THREE.MathUtils.clamp(state.x,-18,18);state.z=THREE.MathUtils.clamp(state.z,-12.15,7.2)}
 if(!state.inDark&&home.blocks(state.x,state.z,state.y||0,false)){state.x=home.spawn.x;state.z=home.spawn.z;state.y=home.spawn.y}
-let y=state.inDark?0:(state.y||0),vertical=0,playing=false,started=false,jumping=false,eatUntil=0,holdClip='Eat',thoughtTimer,captionTimer,quest='',visitorTimer=0,visitorActive=false,noiseTarget=null,noiseSerial=0,threatCooldown=0,lightingTimer=0,broadcastTimer=0;let yaw=2.55,pitch=.58,cameraDistance=5.3,dragging=false,lastX=0,lastY=0,renderLast=0,prev=0,saveTime=0;
-let cameraRetry=0,windowClimb=null;
+let y=state.inDark?0:(state.y||0),vertical=0,playing=false,started=false,jumping=false,eatUntil=0,holdClip='Eat',thoughtTimer,captionTimer,quest='',visitorTimer=0,visitorActive=false,noiseTarget=null,noiseSerial=0,threatCooldown=0,lightingTimer=0,broadcastTimer=0;let yaw=2.55,pitch=.58,cameraDistance=5.3,renderLast=0,prev=0,saveTime=0;
+let windowClimb=null;
 const keys=new Set();const targetLook=new THREE.Vector3(), cameraGoal=new THREE.Vector3(),cameraRay=new THREE.Raycaster();
-const cameraWalls=[...cameraFurniture,...cameraBuildings,...darkWalls];
+const cameraWalls=[...cameraFurniture,...cameraBuildings,...darkWalls],cameraRig=makeFollowCamera(),cameraFades=new Map();
+for(const o of darkWalls){o.updateMatrixWorld();const b=new THREE.Box3().setFromObject(o);cameraSolids.push({minX:b.min.x,maxX:b.max.x,minZ:b.min.z,maxZ:b.max.z,bottom:b.min.y,top:b.max.y})}
+const mouse=bindMouseLook(renderer.domElement,{enabled:()=>playing,onLook:(dx,dy)=>{yaw-=dx*.003;pitch=THREE.MathUtils.clamp(pitch+dy*.0025,.15,1.2)},onUnlock:pause});
 function say(text,ms=4500){$('thought').textContent=text;$('thought').classList.add('show');clearTimeout(thoughtTimer);thoughtTimer=setTimeout(()=>$('thought').classList.remove('show'),ms)}
 function save(){state.x=catRoot.position.x;state.z=catRoot.position.z;state.y=y;try{localStorage.setItem(SAVE,JSON.stringify(state))}catch{}}
 function questUI(){const q=guidance(state);if(quest!==q[0]){quest=q[0];$('quest-title').textContent=q[0];$('quest-copy').textContent=q[1];$('quest-index').textContent='✳';$('quest-category').textContent='A NORTH KOLKATA MORNING'}
@@ -191,28 +194,26 @@ function animate(name,force=false){if(currentAction===name&&!force)return;let ne
 new GLTFLoader().load('./assets/kitten.glb',gltf=>{const model=gltf.scene;catRoot.add(model);model.scale.setScalar(home.SCALE);model.updateMatrixWorld(true);const fitted=new THREE.Box3().setFromObject(model);model.position.y-=fitted.min.y;model.position.x-=(fitted.min.x+fitted.max.x)/2;model.position.z-=(fitted.min.z+fitted.max.z)/2;model.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false}});mixer=new THREE.AnimationMixer(model);for(const clip of gltf.animations){if(clip.name==='Jump')clip.tracks=clip.tracks.filter(t=>!t.name.endsWith('Hips.position'));actions[clip.name]=mixer.clipAction(clip);if(['Jump','LieDown','WakeUp'].includes(clip.name)){actions[clip.name].setLoop(THREE.LoopOnce,1);actions[clip.name].clampWhenFinished=true}}animate('Idle');catRoot.position.set(state.x,y,state.z);questUI();updateLighting();kittenReady=true;finishLoading();renderOnce();},undefined,error=>{$('loading-detail').textContent='The kitten could not be loaded. Please reload the page.';console.error(error)});
 // Keep the walls opaque. Move the camera to the near side of a wall when needed.
 function placeCamera(target,desired,dt=1){
- camera.position.lerp(desired,Math.min(1,dt*9));constrainCamera(target,camera.position,cameraWalls,cameraRay);cameraRetry-=dt;
- if(home.area(target.x,target.z)&&camera.position.distanceTo(target)<1.3&&cameraRetry<=0&&!dragging){
-  cameraRetry=.6;let best=camera.position.distanceTo(target),angle=yaw,chosen=null;
-  for(const offset of [.65,-.65,1.3,-1.3,Math.PI]){const a=yaw+offset,p=target.clone().add(new THREE.Vector3(Math.sin(a)*1.8,1.1,Math.cos(a)*1.8));constrainCamera(target,p,cameraWalls,cameraRay);const d=p.distanceTo(target);if(d>best+.2){best=d;angle=a;chosen=p}}
-  if(chosen){yaw=angle;camera.position.copy(chosen)}
- }
- camera.lookAt(target);
+ const d=target.distanceTo(desired),solids=cameraSolids.filter(s=>target.x>s.minX-d&&target.x<s.maxX+d&&target.z>s.minZ-d&&target.z<s.maxZ+d);
+ const result=cameraRig.solve({target,yaw,pitch,distance:d,solids,dt});camera.position.set(result.position.x,result.position.y,result.position.z);camera.lookAt(target);
+ for(const [o,m] of cameraFades)o.material=m;cameraFades.clear();
+ if(result.confined){const v=target.clone().sub(camera.position);cameraRay.set(camera.position,v.clone().normalize());cameraRay.far=v.length();for(const hit of cameraRay.intersectObjects(cameraWalls,false)){const o=hit.object;if(cameraFades.has(o))continue;cameraFades.set(o,o.material);o.userData.cameraFade??=o.material.clone();o.userData.cameraFade.transparent=true;o.userData.cameraFade.opacity=.18;o.userData.cameraFade.depthWrite=false;o.material=o.userData.cameraFade}}
 }
 function renderOnce(){targetLook.set(catRoot.position.x,home.HEIGHT*.7+y,catRoot.position.z);const d=home.inside(catRoot.position.x,catRoot.position.z)?Math.min(cameraDistance,2.5):cameraDistance;cameraGoal.set(targetLook.x+Math.sin(yaw)*Math.cos(pitch)*d,targetLook.y+Math.sin(pitch)*d,targetLook.z+Math.cos(yaw)*Math.cos(pitch)*d);scene.updateMatrixWorld(true);camera.position.copy(targetLook);placeCamera(targetLook,cameraGoal,1);renderer.render(scene,camera)}
-function pause(){if(!started)return;playing=false;keys.clear();$('pause').hidden=false;save()}
-function resume(){if(!started)return;$('pause').hidden=true;playing=true;prev=performance.now();renderLast=0;requestAnimationFrame(frame)}
-$('start-btn').onclick=()=>{started=true;if(state.day===1&&state.nightWarning&&!state.visitorDone)startVisitor();$('start').hidden=true;$('shell').hidden=false;playing=true;prev=performance.now();requestAnimationFrame(frame);say(state.owner?'The house is still quiet.':'A familiar morning. But something feels different.')};$('pause-btn').onclick=pause;$('help-btn').onclick=pause;$('resume-btn').onclick=resume;
+function pause(){if(!started)return;playing=false;keys.clear();mouse.unlock();$('pause').hidden=false;save()}
+function resume(){if(!started)return;$('pause').hidden=true;playing=true;mouse.lock();prev=performance.now();renderLast=0;requestAnimationFrame(frame)}
+$('start-btn').onclick=()=>{started=true;if(state.day===1&&state.nightWarning&&!state.visitorDone)startVisitor();$('start').hidden=true;$('shell').hidden=false;playing=true;mouse.lock();prev=performance.now();requestAnimationFrame(frame);say(state.owner?'The house is still quiet.':'A familiar morning. But something feels different.')};$('pause-btn').onclick=pause;$('help-btn').onclick=pause;$('resume-btn').onclick=resume;
 $('reset-btn').onclick=()=>{try{localStorage.removeItem(SAVE)}catch{}location.reload()};
 addEventListener('keydown',e=>{if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();if(e.code==='Escape'){if(playing)pause();else if(started)resume();return}if(e.repeat)return;keys.add(e.code);if(e.code==='KeyE')interact();if(e.code==='KeyM'&&playing){say('Mrrrow.');emitNoise(7,'meow')}if(e.code==='KeyH'&&playing)toggleHiding();if(e.code==='Space'&&playing&&!state.hidden&&!jumping&&performance.now()>eatUntil){jumping=true;vertical=5.8;animate('Jump',true)}});addEventListener('keyup',e=>keys.delete(e.code));
 function zoom(amount){cameraDistance=THREE.MathUtils.clamp(cameraDistance+amount,1.5,8)}
 renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();zoom(e.deltaY*.004)},{passive:false});
 $('zoom-in').onclick=()=>zoom(-.7);$('zoom-out').onclick=()=>zoom(.7);
-renderer.domElement.addEventListener('pointerdown',e=>{if(playing){dragging=true;lastX=e.clientX;lastY=e.clientY;renderer.domElement.setPointerCapture(e.pointerId)}});renderer.domElement.addEventListener('pointermove',e=>{if(!dragging)return;yaw-=(e.clientX-lastX)*.006;pitch=THREE.MathUtils.clamp(pitch+(e.clientY-lastY)*.004,.35,1.1);lastX=e.clientX;lastY=e.clientY});renderer.domElement.addEventListener('pointerup',()=>dragging=false);addEventListener('blur',()=>{if(playing)pause()});document.addEventListener('visibilitychange',()=>{if(document.hidden&&playing)pause()});addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(devicePixelRatio||1,1));renderer.setSize(innerWidth,innerHeight);if(!playing&&mixer)renderOnce()});
+addEventListener('blur',()=>{if(playing)pause()});document.addEventListener('visibilitychange',()=>{if(document.hidden&&playing)pause()});addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(devicePixelRatio||1,1));renderer.setSize(innerWidth,innerHeight);if(!playing&&mixer)renderOnce()});
 function validPosition(x,z,height){
  if(state.inDark){if(x<20.4||x>27.6||z< -19.1||z> -12.65)return false;if(x>24.1&&x<25.9&&z> -16.9&&z< -15.7)return false;return true}
  if(x< -18||x>18||z< -12.28||z>7.3)return false;
  if(home.blocks(x,z,height,!jumping))return false;
+ const stepFloor=home.ground(x,z,height);if(!jumping&&stepFloor>height&&home.blocks(x,z,stepFloor,false))return false;
  if((x>3.3&&x<4.3&&z> -5.85&&z< -5.0)||(x>4.5&&x<5.5&&z> -7.7&&z< -6.7)||(x>9.75&&x<12&&z> -12.95&&z< -11.8))return false;
  return true;
 }

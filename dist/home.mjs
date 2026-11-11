@@ -9,7 +9,7 @@ export function area(x,z){return x> -3.6&&x<3.6&&z> -5.2&&z<7.3}
 const cells=new Map();
 for(const s of solids){for(let x=Math.floor(s.minX-RADIUS);x<=Math.floor(s.maxX+RADIUS);x++)for(let z=Math.floor(s.minZ-RADIUS);z<=Math.floor(s.maxZ+RADIUS);z++){const k=x+','+z;if(!cells.has(k))cells.set(k,[]);cells.get(k).push(s)}}
 const at=(x,z)=>cells.get(Math.floor(x)+','+Math.floor(z))||[];
-const overlaps=(s,x,z)=>x>s.minX-RADIUS&&x<s.maxX+RADIUS&&z>s.minZ-RADIUS&&z<s.maxZ+RADIUS;
+const overlaps=(s,x,z)=>{const dx=Math.max(s.minX-x,0,x-s.maxX),dz=Math.max(s.minZ-z,0,z-s.maxZ);return dx*dx+dz*dz<RADIUS*RADIUS};
 export function blocks(x,z,y,stepping=true){return at(x,z).some(s=>overlaps(s,x,z)&&y+HEIGHT>s.bottom+.025&&y<s.top-(stepping?STEP:.025))}
 export function ground(x,z,y){let h=0;for(const s of at(x,z))if(overlaps(s,x,z)&&s.top<=y+STEP+.001)h=Math.max(h,s.top);return h}
 export function ceiling(x,z,oldY,newY){let y=newY;for(const s of at(x,z))if(overlaps(s,x,z)&&s.bottom>=oldY+HEIGHT-.03&&s.bottom<y+HEIGHT)y=s.bottom-HEIGHT;return y}

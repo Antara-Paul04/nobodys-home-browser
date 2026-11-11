@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';import {bindMouseLook} from '../dist/mouse-look.mjs';
+const handlers=()=>{const map=new Map();return {addEventListener(n,fn){map.set(n,fn)},fire(n,e={}){map.get(n)?.(e)}}};
+const doc=handlers(),canvas=handlers();let enabled=true,moves=[],unlocks=0;
+canvas.requestPointerLock=()=>{doc.pointerLockElement=canvas;doc.fire('pointerlockchange')};doc.exitPointerLock=()=>{doc.pointerLockElement=null;doc.fire('pointerlockchange')};
+const mouse=bindMouseLook(canvas,{enabled:()=>enabled,onLook:(x,y)=>moves.push([x,y]),onUnlock:()=>unlocks++,doc});
+canvas.fire('pointermove',{clientX:10,clientY:10,buttons:0});canvas.fire('pointermove',{clientX:22,clientY:7,buttons:0});assert.deepEqual(moves.at(-1),[12,-3],'ordinary mouse movement rotates without holding a button');
+mouse.lock();doc.fire('mousemove',{movementX:18,movementY:6,buttons:0});assert.deepEqual(moves.at(-1),[18,6],'captured mouse rotates without dragging');
+const n=moves.length;enabled=false;doc.fire('mousemove',{movementX:55,movementY:0});assert.equal(moves.length,n,'paused game does not rotate');enabled=true;
+mouse.unlock();assert.equal(unlocks,0,'opening UI does not trigger an extra pause');mouse.lock();doc.pointerLockElement=null;doc.fire('pointerlockchange');assert.equal(unlocks,1,'Escape releases mouse and pauses');
+console.log('Mouse look: no-drag fallback, pointer capture, pause and Escape passed.');
