@@ -15,3 +15,13 @@ export function insideFurniture(x,z){return FURNITURE.some(item=>overlaps(item,x
 export function blocksFurniture(x,z,feetY){return FURNITURE.some(item=>overlaps(item,x,z)&&feetY<item.top-.025)}
 export function supportHeight(x,z){let height=0;for(const item of FURNITURE)if(overlaps(item,x,z))height=Math.max(height,item.top);return height}
 export function stepVertical(y,velocity,ground,dt){const old=y;velocity-=11*dt;y+=velocity*dt;if(velocity<=0&&y<=ground&&old>=ground-.04)return {y:ground,velocity:0,landed:true};if(y<0)return {y:0,velocity:0,landed:true};return {y,velocity,landed:false}}
+// The front wall of the home has real thickness. Only the open window lets the cat
+// through, and only once its paws are up at the sill, where it can also stand.
+export const FRONT_WALL={minX:-4.63,maxX:4.6,minZ:-4.13,maxZ:-3.97};
+export const WINDOW={minX:-3.58,maxX:-2.83,sill:.70,lintel:1.2};
+export function inFrontWall(z){return z>FRONT_WALL.minZ-CAT_RADIUS&&z<FRONT_WALL.maxZ+CAT_RADIUS}
+export function inWindow(x){return x>WINDOW.minX&&x<WINDOW.maxX}
+export function frontWallBlocks(x,z,feetY){if(!inFrontWall(z)||x<FRONT_WALL.minX-CAT_RADIUS||x>FRONT_WALL.maxX+CAT_RADIUS)return false;return !(inWindow(x)&&feetY>=WINDOW.sill-.025&&feetY<WINDOW.lintel)}
+export function groundHeight(x,z){return Math.max(supportHeight(x,z),inFrontWall(z)&&inWindow(x)?WINDOW.sill:0)}
+// Moves a grounded cat that is somehow inside the wall (older saves, edge cases) to the nearer face.
+export function clearOfFrontWall(z){if(!inFrontWall(z))return z;return z>(FRONT_WALL.minZ+FRONT_WALL.maxZ)/2?FRONT_WALL.maxZ+CAT_RADIUS+.01:FRONT_WALL.minZ-CAT_RADIUS-.01}

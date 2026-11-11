@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { normaliseState,advanceTime,period,takeResource,sleep,guidance } from './story.mjs';
-import { insideFurniture,blocksFurniture,supportHeight,stepVertical } from './physics.mjs';
+import { insideFurniture,blocksFurniture,stepVertical,frontWallBlocks,groundHeight,clearOfFrontWall } from './physics.mjs';
 
 const $ = id => document.getElementById(id);
 const SAVE='nobodys-home-web-first-morning-v1';
@@ -116,6 +116,7 @@ const catRoot=new THREE.Group();scene.add(catRoot);let mixer,actions={},currentA
 let state=normaliseState({x:-1.9,z:.3,food:55,water:62,owner:false,ate:false,drank:false,tv:false,outside:false});
 try{const loaded=JSON.parse(localStorage.getItem(SAVE));if(loaded&&typeof loaded.x==='number'&&Number.isFinite(loaded.x))state=normaliseState({...state,...loaded})}catch{}
 if(state.inDark){state.x=THREE.MathUtils.clamp(state.x,20.4,27.6);state.z=THREE.MathUtils.clamp(state.z,-19.1,-12.8)}else{state.x=THREE.MathUtils.clamp(state.x,-12,12);state.z=THREE.MathUtils.clamp(state.z,-19,3.7)}
+if(!state.inDark)state.z=clearOfFrontWall(state.z);
 if(state.z> -4&&insideFurniture(state.x,state.z)){state.x=-1.9;state.z=.3}
 let y=0,vertical=0,playing=false,started=false,jumping=false,eatUntil=0,holdClip='Eat',thoughtTimer,captionTimer,quest='',visitorTimer=0,visitorActive=false,noiseTarget=null,threatCooldown=0,lightingTimer=0,broadcastTimer=0;let yaw=.58,pitch=.72,cameraDistance=5.3,dragging=false,lastX=0,lastY=0,renderLast=0,prev=0,saveTime=0;
 const keys=new Set();const targetLook=new THREE.Vector3(), cameraGoal=new THREE.Vector3(),cameraRay=new THREE.Raycaster(),cameraDirection=new THREE.Vector3();
@@ -186,8 +187,9 @@ function zoom(amount){cameraDistance=THREE.MathUtils.clamp(cameraDistance+amount
 renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();zoom(e.deltaY*.004)},{passive:false});
 $('zoom-in').onclick=()=>zoom(-.7);$('zoom-out').onclick=()=>zoom(.7);
 renderer.domElement.addEventListener('pointerdown',e=>{if(playing){dragging=true;lastX=e.clientX;lastY=e.clientY;renderer.domElement.setPointerCapture(e.pointerId)}});renderer.domElement.addEventListener('pointermove',e=>{if(!dragging)return;yaw-=(e.clientX-lastX)*.006;pitch=THREE.MathUtils.clamp(pitch+(e.clientY-lastY)*.004,.35,1.1);lastX=e.clientX;lastY=e.clientY});renderer.domElement.addEventListener('pointerup',()=>dragging=false);addEventListener('blur',()=>{if(playing)pause()});document.addEventListener('visibilitychange',()=>{if(document.hidden&&playing)pause()});addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(devicePixelRatio||1,1));renderer.setSize(innerWidth,innerHeight);if(!playing&&mixer)renderOnce()});
-function validPosition(x,z,height){if(state.inDark){if(x<20.4||x>27.6||z< -19.1||z> -12.65)return false;if(x>24.1&&x<25.9&&z> -16.9&&z< -15.7)return false;return true}if(x< -13||x>13||z< -20||z>3.8)return false;const wasInside=catRoot.position.z> -4;const isInside=z> -4;
- if(wasInside!==isInside){if(!(x> -3.58&&x< -2.83&&height>.61&&height<1.38))return false}
+function validPosition(x,z,height){if(state.inDark){if(x<20.4||x>27.6||z< -19.1||z> -12.65)return false;if(x>24.1&&x<25.9&&z> -16.9&&z< -15.7)return false;return true}if(x< -13||x>13||z< -20||z>3.8)return false;const isInside=z> -4;
+ // The front wall is solid except at the open window, reached by jumping up to the sill.
+ if(frontWallBlocks(x,z,height))return false;
  if(isInside&&(x< -4.36||x>4.36))return false;
  // Building fronts are solid; the neighbour is entered through its doorway interaction.
  if(!isInside&&z< -12.28&&x> -10.05&&x<9.7)return false;
@@ -199,7 +201,8 @@ function frame(now){if(!playing)return;requestAnimationFrame(frame);if(now-rende
  let a=(keys.has('KeyD')||keys.has('ArrowRight')?1:0)-(keys.has('KeyA')||keys.has('ArrowLeft')?1:0);let b=(keys.has('KeyW')||keys.has('ArrowUp')?1:0)-(keys.has('KeyS')||keys.has('ArrowDown')?1:0);let move=new THREE.Vector3();if(performance.now()>eatUntil&&!state.hidden){const forward=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw)),right=new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));move.addScaledVector(forward,b).addScaledVector(right,a);if(move.lengthSq()>0)move.normalize()}
  const running=keys.has('ShiftLeft')||keys.has('ShiftRight');const speed=running?2.8:1.55;const beforeX=catRoot.position.x,beforeZ=catRoot.position.z;let nx=catRoot.position.x+move.x*speed*dt,nz=catRoot.position.z+move.z*speed*dt;if(validPosition(nx,catRoot.position.z,y))catRoot.position.x=nx;if(validPosition(catRoot.position.x,nz,y))catRoot.position.z=nz;
  if(move.lengthSq()>.001){const target=Math.atan2(move.x,move.z);let diff=Math.atan2(Math.sin(target-catRoot.rotation.y),Math.cos(target-catRoot.rotation.y));catRoot.rotation.y+=diff*Math.min(1,dt*9)}
- const ground=state.inDark?0:(catRoot.position.z> -4?supportHeight(catRoot.position.x,catRoot.position.z):0);
+ if(!state.inDark&&!jumping&&frontWallBlocks(catRoot.position.x,catRoot.position.z,y))catRoot.position.z=clearOfFrontWall(catRoot.position.z);
+ const ground=state.inDark?0:groundHeight(catRoot.position.x,catRoot.position.z);
  if(!jumping&&y>ground+.02){jumping=true;vertical=0}
  if(jumping){const next=stepVertical(y,vertical,ground,dt);y=next.y;vertical=next.velocity;if(next.landed)jumping=false}
  catRoot.position.y=y;

@@ -22,6 +22,7 @@ WASD move; Shift run; Space jump; E interact; M meow; H hide near the bed; drag 
 node tests/physics.test.mjs
 node tests/world.test.cjs
 node tests/story.test.mjs
+node tests/window.test.mjs
 ```
 
 ## Project map
