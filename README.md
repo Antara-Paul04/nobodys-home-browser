@@ -25,6 +25,7 @@ node tests/physics.test.mjs
 node tests/world.test.cjs
 node tests/story.test.mjs
 node tests/window.test.mjs
+node tests/integration.test.mjs
 ```
 
 ## Project map

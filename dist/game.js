@@ -100,7 +100,7 @@ actorPart(dog,unitBox,dogFur,0,.34,0,.65,.36,.95);actorPart(dog,unitBox,dogFur,0
 for(const x of [-.22,.22])for(const z of [-.30,.30])actorPart(dog,unitBox,dogFur,x,.14,z,.13,.28,.14);
 for(const x of [-.16,.16])actorPart(dog,unitBox,iron,x,.78,.48,.12,.19,.13);
 const infected=new THREE.Group();scene.add(infected);infected.position.set(-1,0,-10.6);infected.visible=false;
-const dogThreat=makeThreat('dog',dog.position),infectedThreat=makeThreat('infected',infected.position);
+const dogThreat=makeThreat('dog',dog.position),infectedThreat=makeThreat('infected',infected.position);let visitorThreat=null;
 const cloth=mat('infected clothes',0x535a55),skin=mat('infected skin',0x998f7d);
 actorPart(infected,unitBox,cloth,0,.98,0,.48,.70,.27);actorPart(infected,unitSphere,skin,0,1.53,0,.21,.25,.19);
 for(const x of [-.14,.14])actorPart(infected,unitBox,cloth,x,.28,0,.16,.56,.18);
@@ -134,7 +134,7 @@ const items=[{x:-3,z:2.2,r:2.3,label:'Look for your person',type:'bed',zone:'hom
 function nearby(){let nearest=null,best=Infinity;for(const item of items){if(state.inDark&&item.zone!=='dark')continue;if(!state.inDark&&item.zone==='dark')continue;if(item.zone==='home'&&catRoot.position.z< -4.05)continue;if(item.zone==='street'&&catRoot.position.z> -4.05)continue;const d=Math.hypot(catRoot.position.x-item.x,catRoot.position.z-item.z);if(d<item.r&&d<best){nearest=item;best=d}}return nearest}
 function itemLabel(item){if(item.type==='bed'&&state.owner)return 'Rest by the bed';if(item.type==='food'&&state.homeFood<=0)return 'Inspect the empty bowl';if(item.type==='water'&&state.homeWater<=0)return 'Inspect the empty water bowl';if(['streetFood','porchFood','streetWater','darkFood'].includes(item.type)&&state[item.type]<=0)return 'Nothing left here';return item.label}
 function caption(text,ms=6500){$('caption').textContent=text;$('caption').hidden=false;clearTimeout(captionTimer);captionTimer=setTimeout(()=>$('caption').hidden=true,ms)}
-function startVisitor(){if(visitorActive||state.visitorDone)return;visitorActive=true;visitorTimer=0;state.visitorSeen=true;infected.position.set(-3.2,0,-5.2);infected.visible=true;say('A noise at the window. Someone is outside.',6000)}
+function startVisitor(){if(visitorActive||state.visitorDone)return;visitorActive=true;visitorTimer=0;state.visitorSeen=true;infected.position.set(-3.2,0,-5.05);visitorThreat=makeThreat('infected',infected.position);infected.visible=true;say('A noise at the window. Someone is outside.',6000)}
 function onDawn(){if(state.day>=3&&state.tv){state.tv=false;say('The television has gone quiet.')}state.food=Math.max(0,state.food-12);state.water=Math.max(0,state.water-10);if(state.day===2)say('The bowl is empty. Still no one.',6000);else say('Another quiet morning.',4500);save()}
 function interact(){if(!playing||state.hidden)return;const item=nearby();if(!item)return;
  if(item.type==='bed'){
@@ -164,8 +164,8 @@ function emitNoise(radius,kind='other',origin=catRoot.position){if(state.hidden&
 function updateThreats(dt){
  darkInfected.visible=state.inDark;darkFigure.visible=state.inDark;darkInfected.rotation.z=state.darkAwake?0:.65;
  if(threatCooldown>0)threatCooldown-=dt;if(noiseTarget){noiseTarget.life-=dt;if(noiseTarget.life<=0)noiseTarget=null}
- if(visitorActive){visitorTimer+=dt;infected.visible=true;infected.position.set(-3.2,0,-5.05);infected.rotation.y=Math.sin(visitorTimer*1.5)*.16;
-  if(visitorTimer>28){visitorActive=false;state.visitorDone=true;state.nightWarning=false;state.dangerLearned=true;infected.visible=state.day>=2;infected.position.set(-1,0,-10.6);infectedThreat.mode='idle';infectedThreat.timer=0;say('The sounds fade away. Quiet again.',5000);save()}}
+ if(visitorActive){visitorTimer+=dt;infected.visible=true;
+  if(visitorTimer>28&&!['alert','chase'].includes(visitorThreat.mode)){visitorActive=false;state.visitorDone=true;state.nightWarning=false;state.dangerLearned=true;infected.visible=state.day>=2;infected.position.set(-1,0,-10.6);infectedThreat.mode='idle';infectedThreat.timer=0;visitorThreat=null;say('The sounds fade away. Quiet again.',5000);save()}}
  else infected.visible=state.day>=2;
  const outside=catRoot.position.z< -4.08&&!state.inDark;
  const player={x:catRoot.position.x,z:catRoot.position.z,y,hidden:state.hidden,outside};
@@ -175,7 +175,8 @@ function updateThreats(dt){
   if(result.escaped){state.dangerLearned=true;say(agent.kind==='dog'?'The dog has lost the scent.':'The footsteps fade away.',4000)}
   if(result.caught&&threatCooldown<=0){threatCooldown=5;state.dangerLearned=true;catRoot.position.set(-1.9,0,.3);y=vertical=0;jumping=false;noiseTarget=null;say(agent.kind==='dog'?'Teeth. Not that way.':'Hands. Not that way.',5000);save()}
  }
- if(!visitorActive&&state.day>=2){advanceAgent(infectedThreat,infected);if(outside&&Math.hypot(infected.position.x-catRoot.position.x,infected.position.z-catRoot.position.z)<5)state.seenInfected=true}
+ if(visitorActive){advanceAgent(visitorThreat,infected);if(visitorThreat.mode==='idle')infected.rotation.y=Math.sin(visitorTimer*1.5)*.16}
+ else if(state.day>=2){advanceAgent(infectedThreat,infected);if(outside&&Math.hypot(infected.position.x-catRoot.position.x,infected.position.z-catRoot.position.z)<5)state.seenInfected=true}
  advanceAgent(dogThreat,dog);
  if(state.inDark&&state.darkAwake&&!state.hidden){const dx=catRoot.position.x-darkInfected.position.x,dz=catRoot.position.z-darkInfected.position.z,d=Math.hypot(dx,dz);if(d>.6){darkInfected.position.x+=dx/d*.65*dt;darkInfected.position.z+=dz/d*.65*dt;darkInfected.rotation.y=Math.atan2(dx,dz)}if(d<.7&&threatCooldown<=0){state.inDark=false;state.dangerLearned=true;state.noiseLesson=true;catRoot.position.set(-2.6,0,-11);threatCooldown=5;updateLighting();say('Hands. Back outside.',5000);save()}}
  
