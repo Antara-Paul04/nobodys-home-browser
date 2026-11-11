@@ -1,6 +1,6 @@
 # Nobody’s Home — browser game
 
-A browser-native 3D kitten game set in an older North Kolkata neighbourhood. The main page now opens a free-roam neighbourhood: no hunger, enemies or story gates. The previous story prototype remains available at `story.html`, with its own existing save. The Unity project remains a separate backup.
+A browser-native 3D kitten game set in an older North Kolkata neighbourhood. The main page now opens a free-roam para of narrow lanes: no hunger, enemies or story gates. The previous story prototype remains available at `story.html`, with its own existing save. The Unity project remains a separate backup.
 
 ## Run locally
 
@@ -14,15 +14,22 @@ Open http://localhost:8000 in a browser. The game uses the vendored Three.js fil
 
 ## Controls
 
-Free roam starts in the lane outside home. WASD moves, Shift runs, Space jumps, moving the mouse looks around, and scrolling or +/− zooms. Click Explore/Continue to capture the mouse; Escape releases it and pauses. Browsers that deny mouse capture fall back to ordinary mouse movement without holding a button. Tab opens the map. E climbs through the bedroom window when reachable (otherwise rests), M meows, and R returns to the last clear spot. Pause also offers a return to the home lane and afternoon/evening lighting.
+Free roam starts in the gali outside home. WASD moves, Shift runs, Space jumps, moving the mouse looks around, and scrolling or +/− zooms. Click Explore/Continue to capture the mouse; Escape releases it and pauses. Browsers that deny mouse capture fall back to ordinary mouse movement without holding a button. Tab opens the map. E climbs through the bedroom window when reachable (otherwise rests), M meows, and R returns to the last clear spot. Pause also offers a return to the home lane and afternoon/evening lighting.
 
-Exploration uses `nobodys-home-kolkata-explore-v1`, separate from the story save. The original story still starts in the bedroom, with food, radio and a window exit. It uses the same improved mouse-look and camera boom.
+Exploration uses `nobodys-home-kolkata-explore-v2`, separate from the story save. The original story still starts in the bedroom, with food, radio and a window exit. It uses the same improved mouse-look and camera boom.
 
 ## Neighbourhood
 
-Claude’s original six houses, furnished home, Ambassador taxi and four shops are imported with a uniform 0.75 metre conversion, including their original materials and details. The market contains the tea stall, paan kiosk, grocery and sweet shop. Main and back lanes, side passages and courtyards form connected routes.
+Free roam is a North Kolkata para of narrow lanes, laid out in `dist/explore-layout.mjs`. One unit is 1.33 m; everything authored is scaled 0.75 to match the kitten.
 
-Seven additional houses, including three shopfronts, are generated from a stable seed. Rules vary floor count, bays, paint, weathering, shutters, balconies and rooftop tanks while preserving door/window scale. Instancing keeps repeated details inexpensive. Trees, paving, drainage, wires, planters and small street details are also assembled procedurally. Do not randomize the seed on load or distort the original authored assets.
+- **Lanes.** Kali Mitra Lane (3.4 units wide, a parked taxi leaves a squeeze), the home gali, the back lane, a service lane behind the houses, five connecting galis 1.1–1.5 units wide, a drain alley, and slits between houses that only a cat fits through. A chowk holds the banyan shrine and tea stall; a walled plot holds the pond and tube well; a courtyard sits behind a gateway. The east edge opens onto the big road: tram line, buses, blue-and-white railings.
+- **Houses.** Claude’s six authored houses appear once each, in their original order, on the north side of the main lane; the furnished home fronts the home gali. Fifty-one more houses come from `dist/procedural-buildings.mjs`: old townhouses with rowaks, arched openings, louvred shutters and iron balconies; 1970s flats with grille boxes and jali stair shafts; bare-brick new builds; tin sheds; shop-houses with Bengali signboards. Each lot has a fixed seed, so no house repeats and nothing changes between visits. Party walls are bare brick or cement; walls facing a lane get windows, pipes and meters.
+- **Wear.** Plaster, brick and cement share world-space weathering shaders (`dist/procedural-view.mjs`): rising damp, streaks, plaster peeled back to brick. `dist/decals.mjs` draws one atlas of signs, posters, wall writing, paan stains, moss, drain grime and potholes.
+- **Clutter.** `dist/street-clutter.mjs` places open drains with slabs, garbage heaps with crows, cycles, drums, crates, washing lines, bunting, poles and the overhead wire tangle, chalk hopscotch, alpona, a cricket wicket on a wall. Anything worth bumping into has a collision box.
+- **Trees.** `dist/trees.mjs` grows banyan, peepal, krishnachura, radhachura, neem, mango, jackfruit, kadam, coconut, betel-nut, banana and bamboo from seeds, plus peepal saplings rooted in walls.
+- **Props.** `dist/assets/kolkata-props.glb` holds the Ambassador taxi, hand-pulled rickshaw, cycle van, auto, minibus, bus, tram, tube well, phuchka stall, fruit cart, bins, bus shelter and lamps, exported flat-coloured by `tools/export_kolkata_props.py`. The four authored shops still come from `kolkata-street.glb`.
+
+Everything generated is instanced and grouped into large chunks; a typical view is 150–350 draw calls. Do not randomize seeds on load or distort the authored assets. Add `?inspect` to the URL for a frame readout and `window.__explore.look(x, z, yaw, pitch, distance)` to frame a still.
 
 The camera keeps user yaw independent of obstacle avoidance, checks a camera-sized volume, lifts in cramped areas and eases back out. Where no physical camera view fits, only the actual blocking render object briefly fades. Circular horizontal player collision, short movement substeps and headroom checks avoid snagging corners or stepping into ceilings.
 
@@ -49,9 +56,11 @@ node tests/graphics.test.mjs
 ## Project map
 
 - `dist/index.html`, `dist/explore.css`, `dist/explore.js`: free-roam game and interface.
-- `dist/explore-layout.mjs`, `dist/explore-movement.mjs`: world layout, indexed collision and player movement.
-- `dist/neighbourhood.mjs`: authored asset placement, surfaces and street details.
-- `dist/procedural-buildings.mjs`, `dist/procedural-view.mjs`: deterministic architectural generation and instanced rendering.
+- `dist/explore-layout.mjs`, `dist/explore-movement.mjs`: lanes, building rows, prop placement, indexed collision and player movement.
+- `dist/neighbourhood.mjs`: assembles paving, generated houses, clutter, wires, the pond, the big road and the authored models.
+- `dist/procedural-buildings.mjs`, `dist/procedural-view.mjs`: deterministic house generation; instanced rendering kit with weathered materials.
+- `dist/street-clutter.mjs`, `dist/trees.mjs`, `dist/decals.mjs`: lane dressing, seeded trees, and the sign/stain atlas.
+- `dist/assets/kolkata-props.glb`, `dist/props-data.mjs`: exported vehicles and street furniture with their bounds (`tools/export_kolkata_props.py`).
 - `dist/graphics.mjs`: shared render scale limits and saved graphics preference.
 - `dist/mouse-look.mjs`, `dist/follow-camera.mjs`: shared mouse capture and collision-aware camera.
 - `dist/story.html`, `dist/style.css`: preserved story shell and interface.

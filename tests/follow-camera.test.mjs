@@ -3,7 +3,7 @@ import {makeFollowCamera,segmentBox} from '../dist/follow-camera.mjs';
 import {makeCollisionWorld,spawn} from '../dist/explore-layout.mjs';
 import * as home from '../dist/home.mjs';
 const w=makeCollisionWorld();let checked=0,confined=0;
-const poses=[spawn,{x:-3.4,z:2.04,y:.025},{...home.spawn},{x:-2.25,z:2.0375,y:.855},{x:-2.025,z:2.075,y:.3375},{x:-22,z:-11.4,y:.09},{x:-7.1,z:-10.4,y:.025},{x:12,z:5.7,y:.37},{x:4.35,z:5,y:.025}];
+const poses=[spawn,{x:-3.4,z:2.04,y:.025},{...home.spawn},{x:-2.25,z:2.0375,y:.855},{x:-2.025,z:2.075,y:.3375},{x:-22,z:-9,y:.025},{x:-7.1,z:-8,y:.025},{x:18.6,z:2.45,y:.335},{x:3.03,z:1,y:.025},{x:9.05,z:-8,y:.025},{x:0,z:9.2,y:.025}];
 for(const p of poses)for(let i=0;i<32;i++){
  const target={x:p.x,y:p.y+home.HEIGHT*.7,z:p.z},yaw=i*Math.PI/16,rig=makeFollowCamera(),solids=w.nearby(p.x,p.z,4);
  const out=rig.solve({target,yaw,pitch:.3,distance:2.8,solids});
