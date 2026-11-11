@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';import * as h from '../dist/home.mjs';import {stepVertical} from '../dist/physics.mjs';
 const bed=h.point(6.4,8.5),top=.855;
-assert.equal(h.blocks(bed.x,bed.z,bed.y,false),true,'actual bed blocks walking through mattress');
+assert.equal(h.blocks(bed.x,bed.z,.70,false),true,'actual mattress remains solid');
+assert.equal(h.blocks(bed.x,bed.z,bed.y,false),false,'small kitten fits under the clear part of the bed');
 assert.equal(h.blocks(bed.x,bed.z,top,false),false,'kitten fits between mattress and net frame');
 assert.equal(h.ground(bed.x,bed.z,top),top,'actual mattress supports paws');
 assert.equal(h.landing(bed.x,bed.z,1.05,.80),top,'fall lands on mattress');

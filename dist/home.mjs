@@ -1,5 +1,6 @@
 import data from './home-data.mjs';
-export const SCALE=.75,FRONT_Z=-4.3,RADIUS=.095,HEIGHT=.38,STEP=.18;
+// The source kitten is about 0.30 m tall; use the same metre scale as the house.
+export const SCALE=.75,FRONT_Z=-4.3,RADIUS=.075,HEIGHT=.225,STEP=.10;
 export const point=(u,v,h=.45)=>({x:(3.7-u)*SCALE,z:v*SCALE+FRONT_Z,y:h*SCALE});
 export const spawn=point(4.1,8.6),bed=point(4.25,8.7),food=point(5.1,6.4),water=point(5.8,6.4),radio=point(3.6,4.3),door=point(1.4,.6),window=point(7.2,8.45),visitor=point(8.15,8.45,0);
 export const sourceOrigin=data.sourceOrigin,lights=data.lights,solids=data.solids;

@@ -42,7 +42,7 @@ new GLTFLoader().load('./assets/hero-home.glb',gltf=>{
  for(const light of home.lights){const p=home.point(light.position[0]-home.sourceOrigin,light.position[1],light.position[2]);const lamp=new THREE.PointLight(new THREE.Color(...light.color),3,5,2);lamp.position.set(p.x,p.y,p.z);scene.add(lamp);homeLights.push(lamp)}
  renderer.shadowMap.needsUpdate=true;homeReady=true;finishLoading();if(!playing)renderOnce();
 },undefined,error=>{$('loading-detail').textContent='The furnished home could not be loaded. Please reload.';console.error(error)});
-function bowl(x,z,contents,baseY=0){const b=cylinder(x,baseY+.06,z,.18,.10,M.bowl);return {base:b,contents:cylinder(x,baseY+.115,z,.14,.015,contents)}}
+function bowl(x,z,contents,baseY=0){const b=cylinder(x,baseY+.04,z,.12,.07,M.bowl);return {base:b,contents:cylinder(x,baseY+.08,z,.09,.01,contents)}}
 const homeFoodBowl=bowl(home.food.x,home.food.z,M.food,home.food.y),homeWaterBowl=bowl(home.water.x,home.water.z,M.water,home.water.y);
 // A little shared courtyard sits between the window and lane.
 box(0,-.14,-6,46,.2,40,M.grass);box(0,.005,-5.8,9,.04,3.5,courtyard);
@@ -117,7 +117,7 @@ box(25,.45,-16.3,1.4,.9,.8,M.wood);box(25,.94,-16.3,1.5,.08,.9,M.cream);cylinder
 box(21.3,.2,-17.8,.8,.4,.7,M.dark);cylinder(22.0,.12,-14.6,.11,.24,M.cream);cylinder(22.28,.12,-14.6,.11,.24,M.cream);cylinder(22.15,.36,-14.6,.11,.24,M.cream);
 const darkInfected=infected.clone();scene.add(darkInfected);darkInfected.position.set(26,0,-18);darkInfected.visible=false;
 const darkFigure=infected.clone();scene.add(darkFigure);darkFigure.position.set(27.25,0,-18.6);darkFigure.visible=false;
-const catRoot=new THREE.Group();scene.add(catRoot);let mixer,actions={},currentAction='',modelHeight=.6;
+const catRoot=new THREE.Group();scene.add(catRoot);let mixer,actions={},currentAction='';
 let state=normaliseState({homeLayout:2,x:home.spawn.x,z:home.spawn.z,y:home.spawn.y,food:55,water:62,owner:false,ate:false,drank:false,tv:false,outside:false});
 try{const loaded=JSON.parse(localStorage.getItem(SAVE));if(loaded&&typeof loaded.x==='number'&&Number.isFinite(loaded.x))state=normaliseState({...state,...loaded,homeLayout:loaded.homeLayout??1})}catch{}
 home.migrate(state);
@@ -188,18 +188,18 @@ function updateThreats(dt){
 }
 let noiseHintShown=false;function sayOnceNoise(){if(!noiseHintShown){noiseHintShown=true;say('The sound brought it closer.',5000)}}
 function animate(name,force=false){if(currentAction===name&&!force)return;let next=actions[name]||actions.Idle;if(!next)return;const previous=actions[currentAction];if(previous&&previous!==next)previous.fadeOut(.18);next.reset().fadeIn(.18).play();currentAction=name}
-new GLTFLoader().load('./assets/kitten.glb',gltf=>{const model=gltf.scene;catRoot.add(model);model.updateMatrixWorld(true);const bounds=new THREE.Box3().setFromObject(model),size=new THREE.Vector3();bounds.getSize(size);const scale=.38/Math.max(size.y,.001);model.scale.setScalar(scale);model.updateMatrixWorld(true);const fitted=new THREE.Box3().setFromObject(model);model.position.y-=fitted.min.y;model.position.x-=(fitted.min.x+fitted.max.x)/2;model.position.z-=(fitted.min.z+fitted.max.z)/2;modelHeight=.38;model.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false}});mixer=new THREE.AnimationMixer(model);for(const clip of gltf.animations){if(clip.name==='Jump')clip.tracks=clip.tracks.filter(t=>!t.name.endsWith('Hips.position'));actions[clip.name]=mixer.clipAction(clip);if(['Jump','LieDown','WakeUp'].includes(clip.name)){actions[clip.name].setLoop(THREE.LoopOnce,1);actions[clip.name].clampWhenFinished=true}}animate('Idle');catRoot.position.set(state.x,y,state.z);questUI();updateLighting();kittenReady=true;finishLoading();renderOnce();},undefined,error=>{$('loading-detail').textContent='The kitten could not be loaded. Please reload the page.';console.error(error)});
+new GLTFLoader().load('./assets/kitten.glb',gltf=>{const model=gltf.scene;catRoot.add(model);model.scale.setScalar(home.SCALE);model.updateMatrixWorld(true);const fitted=new THREE.Box3().setFromObject(model);model.position.y-=fitted.min.y;model.position.x-=(fitted.min.x+fitted.max.x)/2;model.position.z-=(fitted.min.z+fitted.max.z)/2;model.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false}});mixer=new THREE.AnimationMixer(model);for(const clip of gltf.animations){if(clip.name==='Jump')clip.tracks=clip.tracks.filter(t=>!t.name.endsWith('Hips.position'));actions[clip.name]=mixer.clipAction(clip);if(['Jump','LieDown','WakeUp'].includes(clip.name)){actions[clip.name].setLoop(THREE.LoopOnce,1);actions[clip.name].clampWhenFinished=true}}animate('Idle');catRoot.position.set(state.x,y,state.z);questUI();updateLighting();kittenReady=true;finishLoading();renderOnce();},undefined,error=>{$('loading-detail').textContent='The kitten could not be loaded. Please reload the page.';console.error(error)});
 // Keep the walls opaque. Move the camera to the near side of a wall when needed.
 function placeCamera(target,desired,dt=1){
  camera.position.lerp(desired,Math.min(1,dt*9));constrainCamera(target,camera.position,cameraWalls,cameraRay);cameraRetry-=dt;
- if(home.area(target.x,target.z)&&camera.position.distanceTo(target)<1.0&&cameraRetry<=0&&!dragging){
+ if(home.area(target.x,target.z)&&camera.position.distanceTo(target)<1.3&&cameraRetry<=0&&!dragging){
   cameraRetry=.6;let best=camera.position.distanceTo(target),angle=yaw,chosen=null;
   for(const offset of [.65,-.65,1.3,-1.3,Math.PI]){const a=yaw+offset,p=target.clone().add(new THREE.Vector3(Math.sin(a)*1.8,1.1,Math.cos(a)*1.8));constrainCamera(target,p,cameraWalls,cameraRay);const d=p.distanceTo(target);if(d>best+.2){best=d;angle=a;chosen=p}}
   if(chosen){yaw=angle;camera.position.copy(chosen)}
  }
  camera.lookAt(target);
 }
-function renderOnce(){targetLook.set(catRoot.position.x,.28+y,catRoot.position.z);const d=home.inside(catRoot.position.x,catRoot.position.z)?Math.min(cameraDistance,2.5):cameraDistance;cameraGoal.set(targetLook.x+Math.sin(yaw)*Math.cos(pitch)*d,targetLook.y+Math.sin(pitch)*d,targetLook.z+Math.cos(yaw)*Math.cos(pitch)*d);scene.updateMatrixWorld(true);camera.position.copy(targetLook);placeCamera(targetLook,cameraGoal,1);renderer.render(scene,camera)}
+function renderOnce(){targetLook.set(catRoot.position.x,home.HEIGHT*.7+y,catRoot.position.z);const d=home.inside(catRoot.position.x,catRoot.position.z)?Math.min(cameraDistance,2.5):cameraDistance;cameraGoal.set(targetLook.x+Math.sin(yaw)*Math.cos(pitch)*d,targetLook.y+Math.sin(pitch)*d,targetLook.z+Math.cos(yaw)*Math.cos(pitch)*d);scene.updateMatrixWorld(true);camera.position.copy(targetLook);placeCamera(targetLook,cameraGoal,1);renderer.render(scene,camera)}
 function pause(){if(!started)return;playing=false;keys.clear();$('pause').hidden=false;save()}
 function resume(){if(!started)return;$('pause').hidden=true;playing=true;prev=performance.now();renderLast=0;requestAnimationFrame(frame)}
 $('start-btn').onclick=()=>{started=true;if(state.day===1&&state.nightWarning&&!state.visitorDone)startVisitor();$('start').hidden=true;$('shell').hidden=false;playing=true;prev=performance.now();requestAnimationFrame(frame);say(state.owner?'The house is still quiet.':'A familiar morning. But something feels different.')};$('pause-btn').onclick=pause;$('help-btn').onclick=pause;$('resume-btn').onclick=resume;
@@ -245,4 +245,4 @@ function frame(now){if(!playing)return;requestAnimationFrame(frame);if(now-rende
  if(!state.inDark&&state.outside&&home.inside(catRoot.position.x,catRoot.position.z)&&!state.returnedHome){state.returnedHome=true;say('Home. It still smells familiar.')}
  if(!state.inDark&&!state.outside&&!home.inside(catRoot.position.x,catRoot.position.z)){state.outside=true;say('No footsteps. No voices. Where did everybody go?',6000)}
  const item=nearby();$('prompt').hidden=!item||jumping||state.hidden;$('prompt-text').textContent=item?itemLabel(item):'';questUI();
- targetLook.set(catRoot.position.x,.28+y,catRoot.position.z);const dist=home.inside(catRoot.position.x,catRoot.position.z)?Math.min(cameraDistance,2.5):cameraDistance;cameraGoal.set(targetLook.x+Math.sin(yaw)*Math.cos(pitch)*dist,targetLook.y+Math.sin(pitch)*dist,targetLook.z+Math.cos(yaw)*Math.cos(pitch)*dist);placeCamera(targetLook,cameraGoal,dt);renderer.render(scene,camera);if(now-saveTime>5000){saveTime=now;save()}}
+ targetLook.set(catRoot.position.x,home.HEIGHT*.7+y,catRoot.position.z);const dist=home.inside(catRoot.position.x,catRoot.position.z)?Math.min(cameraDistance,2.5):cameraDistance;cameraGoal.set(targetLook.x+Math.sin(yaw)*Math.cos(pitch)*dist,targetLook.y+Math.sin(pitch)*dist,targetLook.z+Math.cos(yaw)*Math.cos(pitch)*dist);placeCamera(targetLook,cameraGoal,dt);renderer.render(scene,camera);if(now-saveTime>5000){saveTime=now;save()}}

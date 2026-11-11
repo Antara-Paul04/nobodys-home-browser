@@ -30,6 +30,7 @@ node tests/window.test.mjs
 node tests/integration.test.mjs
 node tests/buildings.test.mjs
 node tests/home.test.mjs
+node tests/kitten-scale.test.mjs
 ```
 
 ## Project map
