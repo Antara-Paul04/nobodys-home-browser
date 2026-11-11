@@ -1,6 +1,11 @@
-import assert from 'node:assert/strict';import {blocksFurniture,supportHeight,stepVertical} from '../dist/physics.mjs';
-assert.equal(blocksFurniture(0,.2,0),true,'sofa blocks at ground level');assert.equal(blocksFurniture(0,.2,.80),false,'cat can clear sofa at jump height');assert.equal(supportHeight(0,.2),.73);assert.equal(supportHeight(-1.9,.3),0);
-let y=0,v=4.5,landed=false,visitedAbove=false;for(let i=0;i<60;i++){let ground=visitedAbove?.73:0;let n=stepVertical(y,v,ground,1/60);y=n.y;v=n.velocity;if(y>.78)visitedAbove=true;if(n.landed){landed=true;break}}assert.equal(visitedAbove,true,'jump clears sofa');assert.equal(landed,true);assert.equal(y,.73,'lands on sofa top');
-assert.equal(blocksFurniture(0,.68,.8),true,'sofa back remains solid above cushion');
-let fall=stepVertical(.75,0,0,.1);assert.ok(fall.y<.75&&!fall.landed,'falls after leaving the edge');
-console.log('Furniture collision, jump landing and walking off edges passed.');
+import assert from 'node:assert/strict';import * as h from '../dist/home.mjs';import {stepVertical} from '../dist/physics.mjs';
+const bed=h.point(6.4,8.5),top=.855;
+assert.equal(h.blocks(bed.x,bed.z,bed.y,false),true,'actual bed blocks walking through mattress');
+assert.equal(h.blocks(bed.x,bed.z,top,false),false,'kitten fits between mattress and net frame');
+assert.equal(h.ground(bed.x,bed.z,top),top,'actual mattress supports paws');
+assert.equal(h.landing(bed.x,bed.z,1.05,.80),top,'fall lands on mattress');
+const sofa=h.point(6.6,1.9);assert.equal(h.blocks(sofa.x,sofa.z,sofa.y,false),true,'authored sofa is solid');
+assert.equal(h.blocks(h.spawn.x,h.spawn.z,h.spawn.y,false),false);
+assert.ok(h.ceiling(bed.x,bed.z,2.5,3.0)<=3.0375-h.HEIGHT,'ceiling and its beams stop upward movement');
+assert.ok(stepVertical(1.2,0,0,.1).y<1.2);
+console.log('Authored bed, sofa, floor, ceiling and falling passed.');

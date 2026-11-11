@@ -1,3 +1,4 @@
+import * as home from './home.mjs';
 // Lightweight threat behaviour; no rendering or browser APIs.
 export const STREET_BLOCKERS=[
  {minX:3.3,maxX:4.3,minZ:-5.85,maxZ:-5.0},
@@ -5,7 +6,7 @@ export const STREET_BLOCKERS=[
  {minX:9.75,maxX:12,minZ:-12.95,maxZ:-11.8},
  {minX:-18.5,maxX:18.5,minZ:-20,maxZ:-12.28}
 ];
-export function blockedPoint(x,z){return z> -4.35||STREET_BLOCKERS.some(r=>x>r.minX&&x<r.maxX&&z>r.minZ&&z<r.maxZ)}
+export function blockedPoint(x,z){return home.inside(x,z)||home.blocks(x,z,0,false)||STREET_BLOCKERS.some(r=>x>r.minX&&x<r.maxX&&z>r.minZ&&z<r.maxZ)}
 // A small number of static rectangles: sampling keeps the cost bounded.
 export function lineClear(a,b){const distance=Math.hypot(b.x-a.x,b.z-a.z);const count=Math.max(1,Math.ceil(distance/.25));for(let i=1;i<count;i++){const t=i/count;if(blockedPoint(a.x+(b.x-a.x)*t,a.z+(b.z-a.z)*t))return false}return true}
 export function makeThreat(kind,position){return {kind,position,home:{x:position.x,z:position.z},mode:kind==='dog'?'patrol':'idle',timer:0,lastNoise:0,patrol:0,lastKnown:null,cooldown:0}}
@@ -16,7 +17,7 @@ export function stepThreat(agent,dt,player,noise){
  const elevated=player.y>(agent.kind==='dog'?.75:.6);
  const canSee=player.outside&&!player.hidden&&!elevated&&distance<(agent.kind==='dog'?3.3:3.5)&&lineClear(p,player);
  let noticedNoise=false;
- if(noise&&noise.id!==agent.lastNoise&&Math.hypot(noise.x-p.x,noise.z-p.z)<noise.radius){agent.lastNoise=noise.id;agent.lastKnown={x:noise.x,z:Math.min(-4.36,noise.z)};noticedNoise=true;if(agent.mode!=='chase'&&agent.cooldown<=0){agent.mode='investigate';agent.timer=0}}
+ if(noise&&noise.id!==agent.lastNoise&&Math.hypot(noise.x-p.x,noise.z-p.z)<noise.radius){agent.lastNoise=noise.id;agent.lastKnown={x:noise.x,z:noise.z};noticedNoise=true;if(agent.mode!=='chase'&&agent.cooldown<=0){agent.mode='investigate';agent.timer=0}}
  if(canSee&&agent.cooldown<=0&&agent.mode!=='alert'&&agent.mode!=='chase'){agent.mode='alert';agent.timer=0;agent.lastKnown={x:player.x,z:player.z}}
  if(agent.mode==='alert'){
   if(canSee)agent.lastKnown={x:player.x,z:player.z};
