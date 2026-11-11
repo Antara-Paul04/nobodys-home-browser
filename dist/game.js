@@ -63,21 +63,31 @@ box(.4,2.52,-6.55,7.1,.025,.025,iron);box(-1.1,2.24,-6.55,.65,.55,.025,M.cream);
 box(0,.005,-9.9,32,.05,4.2,M.road);box(0,.03,-7.72,32,.08,.35,M.pave);box(0,.03,-12.02,32,.08,.35,M.pave);
 for(let x=-12.5;x<13;x+=.55)detail(x,.075,-12.18,.48,.10,.42,M.floor);
 for(let x=-12.8;x<13;x+=.42)detail(x,.035,-7.58,.28,.025,.10,iron);
-// Closely spaced, two-storey houses: shuttered windows and iron balconies.
-function oldHouse(x,z,colour,variant){
- cameraBuildings.push(box(x,2.12,z,4.8,4.24,2.65,colour));box(x,4.27,z,5.0,.13,2.84,M.trim);
- box(x,2.44,z+1.36,4.85,.13,.18,M.trim);box(x,.99,z+1.37,.90,1.98,.10,deepGreen);
- detail(x,2.02,z+1.45,1.1,.10,.12,M.trim);detail(x-.52,1.0,z+1.44,.09,2.0,.10,M.trim);detail(x+.52,1.0,z+1.44,.09,2.0,.10,M.trim);
- for(const dx of [-1.55,1.55]){const wx=x+dx;box(wx,1.3,z+1.39,.80,1.18,.10,deepGreen);detail(wx,1.94,z+1.45,.99,.09,.10,M.trim);for(let y=.83;y<1.82;y+=.10)detail(wx,y,z+1.46,.70,.028,.025,M.fabric);detail(wx,1.35,z+1.49,.03,1.1,.02,iron)}
- // The upper verandah is a flat balcony with thin iron bars.
- box(x,2.52,z+1.65,4.45,.13,.67,terracotta);box(x,3.33,z+1.96,4.45,.06,.05,iron);
- for(let dx=-2.12;dx<=2.12;dx+=.22)detail(x+dx,2.94,z+1.96,.025,.78,.025,iron);
- for(const dx of [-1.35,0,1.35]){const wx=x+dx;box(wx,3.35,z+1.40,.82,1.42,.08,deepGreen);for(let y=2.75;y<4.0;y+=.12)detail(wx,y,z+1.46,.72,.03,.02,M.fabric);detail(wx,4.1,z+1.44,.94,.09,.07,M.trim)}
- // Cornice blocks and deliberately uneven marks on the plaster.
- for(let dx=-2;dx<=2;dx+=.5)detail(x+dx,4.09,z+1.39,.11,.21,.12,M.trim);
- for(let i=0;i<4;i++)detail(x-2.2+i*.13,.35+i*.11,z+1.41,.10,.025,.012,wallShadow);
+// Placeholder blocks also serve as camera obstacles if the authored models fail to load.
+const houseFallback=[];
+for(const [x,colour] of [[-7.5,fadedRose],[-2.6,sunwall],[2.3,teal],[7.2,M.wall]]){
+ const proxy=box(x,2.12,-13.75,4.8,4.24,2.65,colour);cameraBuildings.push(proxy);houseFallback.push(proxy);
 }
-oldHouse(-7.5,-13.75,fadedRose,0);oldHouse(-2.6,-13.75,sunwall,1);oldHouse(2.3,-13.75,teal,2);oldHouse(7.2,-13.75,M.wall,3);
+// The six separate Blender houses are positioned behind the existing lane boundary,
+// leaving the neighbour door, shop, food and threat paths exactly where they were.
+new GLTFLoader().load('./assets/kolkata-houses.glb',gltf=>{
+ const houses=[];
+ for(let i=1;i<=6;i++){
+  const house=gltf.scene.children.find(o=>o.name.startsWith(`House_${i}_`));
+  if(!house){console.warn('Kolkata house asset is incomplete');return}
+  houses.push(house);
+ }
+ const centers=[-12.4,-7.5,-2.6,2.3,7.2,12.1];
+ for(let i=0;i<houses.length;i++){
+  const house=houses[i];scene.add(house);house.scale.set(1,.75,.75);house.updateMatrixWorld(true);
+  let bounds=new THREE.Box3().setFromObject(house);house.scale.x=4.7/(bounds.max.x-bounds.min.x);
+  house.updateMatrixWorld(true);bounds=new THREE.Box3().setFromObject(house);
+  house.position.set(centers[i]-(bounds.min.x+bounds.max.x)/2,-bounds.min.y,-12.31-bounds.max.z);
+  house.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false}});
+ }
+ houseFallback.forEach(house=>{house.visible=false});
+ if(typeof playing!=='undefined'&&!playing)renderOnce();
+},undefined,error=>console.warn('Could not load Kolkata houses; using placeholders.',error));
 // Everyday props drawn from the Unity home: slippers, phone, laptop and shopping.
 box(-1.45,.045,2.8,.18,.09,.34,M.dark);box(-1.18,.045,2.87,.18,.09,.34,M.dark);
 box(1.2,.635,-.1,.32,.025,.22,iron);const laptop=box(1.2,.76,-.21,.32,.23,.025,iron);laptop.rotation.x=-.18;

@@ -37,6 +37,7 @@ node tests/integration.test.mjs
 - `dist/physics.mjs`: furniture collisions, support surfaces and jump physics.
 - `dist/story.mjs`: persistent survival state and story progression.
 - `dist/assets/kitten.glb`: the approved kitten model, texture, rig and animations.
+- `dist/assets/kolkata-houses.glb`: six lane houses exported from Claude's `kolkata-buildings.blend`. Their procedural Blender weathering currently uses flat base colours in the browser. `tools/export_kolkata_buildings.py` recreates the export without saving changes to the source file.
 - `tests/`: lightweight checks.
 
 This is a prototype, not a completed game. Dog and infected visuals are placeholders. Furniture jumping, camera collision, night encounters and the dark-house route still require end-to-end playtesting. Time-of-day changes without day-number countdown screens; television and other optional story interactions must not gate exploration. Keep the user's low-power and no-Unreal/Unity-launch preferences in mind.
