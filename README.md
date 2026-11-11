@@ -35,4 +35,4 @@ node tests/story.test.mjs
 
 This is a prototype, not a completed game. Dog and infected visuals are placeholders. Furniture jumping, camera collision, night encounters and the dark-house route still require end-to-end playtesting. Time-of-day changes without day-number countdown screens; television and other optional story interactions must not gate exploration. Keep the user's low-power and no-Unreal/Unity-launch preferences in mind.
 
-The existing deployed Site is configured separately in `.openai/hosting.json`; repository pushes do not automatically publish a new game version. Do not change visibility, secrets or deployment settings without the owner's request.
+The public playable game is published automatically by GitHub Pages whenever changes in `dist/` are pushed to `main`: https://antara-paul04.github.io/nobodys-home-browser/. After completing a requested change, run the lightweight checks, commit only the intended changes, and push `main` to `github` so the game updates. Allow a few minutes for deployment. The older private Site remains a separate backup; do not change its visibility or settings.
