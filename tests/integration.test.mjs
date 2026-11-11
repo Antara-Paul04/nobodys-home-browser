@@ -3,7 +3,7 @@ import {fileURLToPath} from 'node:url';
 const dir=fileURLToPath(new URL('..',import.meta.url));
 const story=await import(dir+'/dist/story.mjs'),physics=await import(dir+'/dist/physics.mjs'),camera=await import(dir+'/dist/camera.mjs'),threats=await import(dir+'/dist/threats.mjs');
 let handlers={},nodes=new Map(),saved={};function node(id){if(!nodes.has(id)){const cls={add(){},remove(){},toggle(){}};nodes.set(id,{id,hidden:false,disabled:false,textContent:'',innerHTML:'',style:{},classList:cls,parentElement:{classList:cls},appendChild(){},addEventListener(){},setPointerCapture(){}})}return nodes.get(id)}
-let canvas=node('canvas');const T={...three,WebGLRenderer:class{constructor(){this.domElement=canvas}setPixelRatio(){}setSize(){}render(){}}};
+let canvas=node('canvas');const T={...three,WebGLRenderer:class{constructor(){this.domElement=canvas;this.shadowMap={}}setPixelRatio(){}setSize(){}render(){}}};
 class Loader{load(path,ok){if(path.includes('kolkata-houses'))return;let scene=new T.Group();scene.add(new T.Mesh(new T.BoxGeometry(.4,.6,.5),new T.MeshBasicMaterial()));ok({scene,animations:[]})}}
 const document={getElementById:node,addEventListener(){},hidden:false};const storage={getItem:k=>saved[k]??null,setItem:(k,v)=>saved[k]=v,removeItem:k=>delete saved[k]};
 let code=fs.readFileSync(dir+'/dist/game.js','utf8').replace(/^import .*?;\s*$/gm,'');

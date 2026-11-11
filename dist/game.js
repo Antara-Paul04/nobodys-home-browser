@@ -6,18 +6,22 @@ import { makeThreat,stepThreat } from './threats.mjs';
 import { insideFurniture,blocksFurniture,stepVertical,frontWallBlocks,groundHeight,clearOfFrontWall } from './physics.mjs';
 
 const $ = id => document.getElementById(id);
+let buildingsReady=false,kittenReady=false;
+function finishLoading(){if(!buildingsReady||!kittenReady)return;$('loading').hidden=true;$('start-btn').disabled=false;$('start-btn').innerHTML='Begin the morning <span>↗</span>'}
+
 const SAVE='nobodys-home-web-first-morning-v1';
 const scene=new THREE.Scene(); scene.background=new THREE.Color(0xb8c9bc); scene.fog=new THREE.Fog(0x69746f,15,36);
 const camera=new THREE.PerspectiveCamera(42,innerWidth/innerHeight,.05,100);
 const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'low-power',alpha:false});
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFShadowMap;renderer.shadowMap.autoUpdate=false;
 renderer.setPixelRatio(Math.min(devicePixelRatio||1,1)); renderer.setSize(innerWidth,innerHeight); renderer.outputColorSpace=THREE.SRGBColorSpace; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=.72; $('game').appendChild(renderer.domElement);
-const ambient=new THREE.HemisphereLight(0xf7edce,0x667d6f,2.1); scene.add(ambient); const sun=new THREE.DirectionalLight(0xffe8bb,2); sun.position.set(-5,10,6); scene.add(sun);
+const ambient=new THREE.HemisphereLight(0xf7edce,0x667d6f,2.1); scene.add(ambient); const sun=new THREE.DirectionalLight(0xffe8bb,2); sun.position.set(-5,10,6);scene.add(sun);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-24,right:24,top:24,bottom:-24,near:.1,far:70});sun.shadow.bias=-.0003;sun.shadow.normalBias=.025;
 const mats={}; const mat=(name,color,roughness=1)=>mats[name]??(mats[name]=new THREE.MeshStandardMaterial({color,roughness}));
 const M={floor:mat('floor',0x713e35), plank:mat('plank',0x854237),wall:mat('wall',0xe1cfad),trim:mat('trim',0xf1ead7),dark:mat('dark',0x506359),wood:mat('wood',0x8d644b),cream:mat('cream',0xe7ddca),fabric:mat('fabric',0x8d9b85),pink:mat('pink',0xbd8e7c),bowl:mat('bowl',0x9eb3a1),water:mat('water',0x86aeb0,.3),food:mat('food',0x8c664f),grass:mat('grass',0x9eaf8b),road:mat('road',0x777c6d),pave:mat('pave',0xbeb9a6),leaf:mat('leaf',0x7d9872),trunk:mat('trunk',0x806b53),brick:mat('brick',0xb98c75),gold:mat('gold',0xd3af70),glass:mat('glass',0xb4d7cf)};
 M.wall.side=THREE.DoubleSide;
 const unitBox=new THREE.BoxGeometry(1,1,1), unitCylinder=new THREE.CylinderGeometry(1,1,1,12), unitSphere=new THREE.SphereGeometry(1,12,8);
 const cameraFurniture=[],cameraBuildings=[];
-function box(x,y,z,w,h,d,m){const mesh=new THREE.Mesh(unitBox,m);mesh.position.set(x,y,z);mesh.scale.set(w,h,d);scene.add(mesh);if((m===M.fabric||m===M.wood)&&h>=.35&&x> -4.6&&x<4.6&&z> -4&&z<4)cameraFurniture.push(mesh);return mesh}
+function box(x,y,z,w,h,d,m){const mesh=new THREE.Mesh(unitBox,m);mesh.position.set(x,y,z);mesh.scale.set(w,h,d);mesh.receiveShadow=true;scene.add(mesh);if((m===M.fabric||m===M.wood)&&h>=.35&&x> -4.6&&x<4.6&&z> -4&&z<4)cameraFurniture.push(mesh);return mesh}
 function cylinder(x,y,z,r,h,m,r2=r){const mesh=new THREE.Mesh(unitCylinder,m);mesh.position.set(x,y,z);mesh.scale.set(r,h,r2);scene.add(mesh);return mesh}
 function ball(x,y,z,sx,sy,sz,m){const mesh=new THREE.Mesh(unitSphere,m);mesh.position.set(x,y,z);mesh.scale.set(sx,sy,sz);scene.add(mesh);return mesh}
 // Small architectural details are instanced by material to keep draw calls low.
@@ -60,34 +64,36 @@ function plant(x,z){cylinder(x,.18,z,.21,.36,terracotta);ball(x,.55,z,.36,.32,.3
 plant(-4.12,-5.0);plant(3.45,-6.8);plant(-2.3,-7.15);
 box(.4,2.52,-6.55,7.1,.025,.025,iron);box(-1.1,2.24,-6.55,.65,.55,.025,M.cream);box(.05,2.32,-6.55,.62,.40,.025,M.pink);box(1.16,2.22,-6.55,.72,.6,.025,M.fabric);
 // Narrow lane, open drains and worn red-oxide rowaks outside the houses.
-box(0,.005,-9.9,32,.05,4.2,M.road);box(0,.03,-7.72,32,.08,.35,M.pave);box(0,.03,-12.02,32,.08,.35,M.pave);
-for(let x=-12.5;x<13;x+=.55)detail(x,.075,-12.18,.48,.10,.42,M.floor);
-for(let x=-12.8;x<13;x+=.42)detail(x,.035,-7.58,.28,.025,.10,iron);
+box(0,.005,-9.9,40,.05,4.2,M.road);box(0,.03,-7.72,40,.08,.35,M.pave);box(0,.03,-12.02,40,.08,.35,M.pave);
+for(let x=-18;x<18;x+=.55)detail(x,.075,-12.18,.48,.10,.42,M.floor);
+for(let x=-18;x<18;x+=.42)detail(x,.035,-7.58,.28,.025,.10,iron);
 // Placeholder blocks also serve as camera obstacles if the authored models fail to load.
 const houseFallback=[];
 for(const [x,colour] of [[-7.5,fadedRose],[-2.6,sunwall],[2.3,teal],[7.2,M.wall]]){
  const proxy=box(x,2.12,-13.75,4.8,4.24,2.65,colour);cameraBuildings.push(proxy);houseFallback.push(proxy);
 }
-// The six separate Blender houses are positioned behind the existing lane boundary,
-// leaving the neighbour door, shop, food and threat paths exactly where they were.
-new GLTFLoader().load('./assets/kolkata-houses.glb',gltf=>{
- const houses=[];
- for(let i=1;i<=6;i++){
-  const house=gltf.scene.children.find(o=>o.name.startsWith(`House_${i}_`));
-  if(!house){console.warn('Kolkata house asset is incomplete');return}
-  houses.push(house);
+// Keep the authored row intact: only one uniform conversion to game scale.
+// The source's third-house doorway is aligned with the existing neighbour interaction.
+new GLTFLoader().load('./assets/kolkata-houses.glb?v=weathered-2',gltf=>{
+ const row=gltf.scene;
+ if(row.children.filter(o=>o.name.startsWith('House_')).length!==6){$('loading-detail').textContent='The building models are incomplete. Please reload the page.';return}
+ row.scale.setScalar(.75);row.position.x=2.36875;row.updateMatrixWorld(true);
+ const bounds=new THREE.Box3().setFromObject(row);
+ row.position.y=-bounds.min.y;row.position.z=-12.31-bounds.max.z;
+ scene.add(row);row.updateMatrixWorld(true);
+ row.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true}});
+ // Camera obstacles follow the imported houses, including their actual heights.
+ for(const house of row.children){
+  const bounds=new THREE.Box3().setFromObject(house),size=new THREE.Vector3(),center=new THREE.Vector3();
+  bounds.getSize(size);bounds.getCenter(center);
+  const proxy=new THREE.Mesh(unitBox,M.wall);proxy.position.copy(center);proxy.scale.copy(size);proxy.visible=false;
+  scene.add(proxy);cameraWalls.push(proxy);
  }
- const centers=[-12.4,-7.5,-2.6,2.3,7.2,12.1];
- for(let i=0;i<houses.length;i++){
-  const house=houses[i];scene.add(house);house.scale.set(1,.75,.75);house.updateMatrixWorld(true);
-  let bounds=new THREE.Box3().setFromObject(house);house.scale.x=4.7/(bounds.max.x-bounds.min.x);
-  house.updateMatrixWorld(true);bounds=new THREE.Box3().setFromObject(house);
-  house.position.set(centers[i]-(bounds.min.x+bounds.max.x)/2,-bounds.min.y,-12.31-bounds.max.z);
-  house.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false}});
- }
- houseFallback.forEach(house=>{house.visible=false});
- if(typeof playing!=='undefined'&&!playing)renderOnce();
-},undefined,error=>console.warn('Could not load Kolkata houses; using placeholders.',error));
+ houseFallback.forEach(house=>{house.visible=false;const i=cameraWalls.indexOf(house);if(i>=0)cameraWalls.splice(i,1)});
+ // Buildings are static: calculate their shadows once, not on every frame.
+ renderer.shadowMap.needsUpdate=true;buildingsReady=true;finishLoading();
+ if(!playing)renderOnce();
+},undefined,error=>{$('loading-detail').textContent='The buildings could not be loaded. Please reload the page.';console.error(error)});
 // Everyday props drawn from the Unity home: slippers, phone, laptop and shopping.
 box(-1.45,.045,2.8,.18,.09,.34,M.dark);box(-1.18,.045,2.87,.18,.09,.34,M.dark);
 box(1.2,.635,-.1,.32,.025,.22,iron);const laptop=box(1.2,.76,-.21,.32,.23,.025,iron);laptop.rotation.x=-.18;
@@ -129,7 +135,7 @@ const darkFigure=infected.clone();scene.add(darkFigure);darkFigure.position.set(
 const catRoot=new THREE.Group();scene.add(catRoot);let mixer,actions={},currentAction='',modelHeight=.6;
 let state=normaliseState({x:-1.9,z:.3,food:55,water:62,owner:false,ate:false,drank:false,tv:false,outside:false});
 try{const loaded=JSON.parse(localStorage.getItem(SAVE));if(loaded&&typeof loaded.x==='number'&&Number.isFinite(loaded.x))state=normaliseState({...state,...loaded})}catch{}
-if(state.inDark){state.x=THREE.MathUtils.clamp(state.x,20.4,27.6);state.z=THREE.MathUtils.clamp(state.z,-19.1,-12.8)}else{state.x=THREE.MathUtils.clamp(state.x,-12,12);state.z=THREE.MathUtils.clamp(state.z,-19,3.7)}
+if(state.inDark){state.x=THREE.MathUtils.clamp(state.x,20.4,27.6);state.z=THREE.MathUtils.clamp(state.z,-19.1,-12.8)}else{state.x=THREE.MathUtils.clamp(state.x,-18,18);state.z=THREE.MathUtils.clamp(state.z,-19,3.7)}
 if(!state.inDark)state.z=clearOfFrontWall(state.z);
 if(state.z> -4&&insideFurniture(state.x,state.z)){state.x=-1.9;state.z=.3}
 let y=0,vertical=0,playing=false,started=false,jumping=false,eatUntil=0,holdClip='Eat',thoughtTimer,captionTimer,quest='',visitorTimer=0,visitorActive=false,noiseTarget=null,noiseSerial=0,threatCooldown=0,lightingTimer=0,broadcastTimer=0;let yaw=.58,pitch=.72,cameraDistance=5.3,dragging=false,lastX=0,lastY=0,renderLast=0,prev=0,saveTime=0;
@@ -193,7 +199,7 @@ function updateThreats(dt){
 }
 let noiseHintShown=false;function sayOnceNoise(){if(!noiseHintShown){noiseHintShown=true;say('The sound brought it closer.',5000)}}
 function animate(name,force=false){if(currentAction===name&&!force)return;let next=actions[name]||actions.Idle;if(!next)return;const previous=actions[currentAction];if(previous&&previous!==next)previous.fadeOut(.18);next.reset().fadeIn(.18).play();currentAction=name}
-new GLTFLoader().load('./assets/kitten.glb',gltf=>{const model=gltf.scene;catRoot.add(model);model.updateMatrixWorld(true);const bounds=new THREE.Box3().setFromObject(model),size=new THREE.Vector3();bounds.getSize(size);const scale=.64/Math.max(size.y,.001);model.scale.setScalar(scale);model.updateMatrixWorld(true);const fitted=new THREE.Box3().setFromObject(model);model.position.y-=fitted.min.y;model.position.x-=(fitted.min.x+fitted.max.x)/2;model.position.z-=(fitted.min.z+fitted.max.z)/2;modelHeight=.64;model.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false}});mixer=new THREE.AnimationMixer(model);for(const clip of gltf.animations){if(clip.name==='Jump')clip.tracks=clip.tracks.filter(t=>!t.name.endsWith('Hips.position'));actions[clip.name]=mixer.clipAction(clip);if(['Jump','LieDown','WakeUp'].includes(clip.name)){actions[clip.name].setLoop(THREE.LoopOnce,1);actions[clip.name].clampWhenFinished=true}}animate('Idle');catRoot.position.set(state.x,0,state.z);questUI();updateLighting();$('loading').hidden=true;$('start-btn').disabled=false;$('start-btn').innerHTML='Begin the morning <span>↗</span>';renderOnce();},undefined,error=>{$('loading-detail').textContent='The kitten could not be loaded. Please reload the page.';console.error(error)});
+new GLTFLoader().load('./assets/kitten.glb',gltf=>{const model=gltf.scene;catRoot.add(model);model.updateMatrixWorld(true);const bounds=new THREE.Box3().setFromObject(model),size=new THREE.Vector3();bounds.getSize(size);const scale=.64/Math.max(size.y,.001);model.scale.setScalar(scale);model.updateMatrixWorld(true);const fitted=new THREE.Box3().setFromObject(model);model.position.y-=fitted.min.y;model.position.x-=(fitted.min.x+fitted.max.x)/2;model.position.z-=(fitted.min.z+fitted.max.z)/2;modelHeight=.64;model.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false}});mixer=new THREE.AnimationMixer(model);for(const clip of gltf.animations){if(clip.name==='Jump')clip.tracks=clip.tracks.filter(t=>!t.name.endsWith('Hips.position'));actions[clip.name]=mixer.clipAction(clip);if(['Jump','LieDown','WakeUp'].includes(clip.name)){actions[clip.name].setLoop(THREE.LoopOnce,1);actions[clip.name].clampWhenFinished=true}}animate('Idle');catRoot.position.set(state.x,0,state.z);questUI();updateLighting();kittenReady=true;finishLoading();renderOnce();},undefined,error=>{$('loading-detail').textContent='The kitten could not be loaded. Please reload the page.';console.error(error)});
 // Keep the walls opaque. Move the camera to the near side of a wall when needed.
 function placeCamera(target,desired,dt=1){camera.position.lerp(desired,Math.min(1,dt*9));constrainCamera(target,camera.position,cameraWalls,cameraRay);camera.lookAt(target)}
 function renderOnce(){targetLook.set(catRoot.position.x,.5,catRoot.position.z);cameraGoal.set(targetLook.x+Math.sin(yaw)*Math.cos(pitch)*cameraDistance,targetLook.y+Math.sin(pitch)*cameraDistance,targetLook.z+Math.cos(yaw)*Math.cos(pitch)*cameraDistance);scene.updateMatrixWorld(true);camera.position.copy(targetLook);placeCamera(targetLook,cameraGoal,1);renderer.render(scene,camera)}
@@ -206,12 +212,12 @@ function zoom(amount){cameraDistance=THREE.MathUtils.clamp(cameraDistance+amount
 renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();zoom(e.deltaY*.004)},{passive:false});
 $('zoom-in').onclick=()=>zoom(-.7);$('zoom-out').onclick=()=>zoom(.7);
 renderer.domElement.addEventListener('pointerdown',e=>{if(playing){dragging=true;lastX=e.clientX;lastY=e.clientY;renderer.domElement.setPointerCapture(e.pointerId)}});renderer.domElement.addEventListener('pointermove',e=>{if(!dragging)return;yaw-=(e.clientX-lastX)*.006;pitch=THREE.MathUtils.clamp(pitch+(e.clientY-lastY)*.004,.35,1.1);lastX=e.clientX;lastY=e.clientY});renderer.domElement.addEventListener('pointerup',()=>dragging=false);addEventListener('blur',()=>{if(playing)pause()});document.addEventListener('visibilitychange',()=>{if(document.hidden&&playing)pause()});addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(devicePixelRatio||1,1));renderer.setSize(innerWidth,innerHeight);if(!playing&&mixer)renderOnce()});
-function validPosition(x,z,height){if(state.inDark){if(x<20.4||x>27.6||z< -19.1||z> -12.65)return false;if(x>24.1&&x<25.9&&z> -16.9&&z< -15.7)return false;return true}if(x< -13||x>13||z< -20||z>3.8)return false;const isInside=z> -4;
+function validPosition(x,z,height){if(state.inDark){if(x<20.4||x>27.6||z< -19.1||z> -12.65)return false;if(x>24.1&&x<25.9&&z> -16.9&&z< -15.7)return false;return true}if(x< -18||x>18||z< -20||z>3.8)return false;const isInside=z> -4;
  // The front wall is solid except at the open window, reached by jumping up to the sill.
  if(frontWallBlocks(x,z,height))return false;
  if(isInside&&(x< -4.36||x>4.36))return false;
  // Building fronts are solid; the neighbour is entered through its doorway interaction.
- if(!isInside&&z< -12.28&&x> -10.05&&x<9.7)return false;
+ if(!isInside&&z< -12.28&&x> -18.5&&x<18.5)return false;
  if(!isInside&&((x>3.3&&x<4.3&&z> -5.85&&z< -5.0)||(x>4.5&&x<5.5&&z> -7.7&&z< -6.7)||(x>9.75&&x<12.0&&z> -12.95&&z< -11.8)))return false;
  // Furniture blocks the cat at the side and supports it when jumping onto the top.
  if(isInside&&blocksFurniture(x,z,height))return false;

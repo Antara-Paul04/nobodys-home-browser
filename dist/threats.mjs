@@ -3,7 +3,7 @@ export const STREET_BLOCKERS=[
  {minX:3.3,maxX:4.3,minZ:-5.85,maxZ:-5.0},
  {minX:4.5,maxX:5.5,minZ:-7.7,maxZ:-6.7},
  {minX:9.75,maxX:12,minZ:-12.95,maxZ:-11.8},
- {minX:-10.05,maxX:9.7,minZ:-20,maxZ:-12.28}
+ {minX:-18.5,maxX:18.5,minZ:-20,maxZ:-12.28}
 ];
 export function blockedPoint(x,z){return z> -4.35||STREET_BLOCKERS.some(r=>x>r.minX&&x<r.maxX&&z>r.minZ&&z<r.maxZ)}
 // A small number of static rectangles: sampling keeps the cost bounded.
