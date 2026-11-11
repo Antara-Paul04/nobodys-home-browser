@@ -10,7 +10,7 @@ From the repository root:
 python3 -m http.server 8000 --directory dist
 ```
 
-Open http://localhost:8000 in a browser. The game uses the vendored Three.js files and the kitten asset in `dist/`; no build or npm install is required to run it. Press Play to start rendering. The renderer is capped at 24 FPS, at most 850,000 pixels in free roam, and pauses when the tab loses focus. Static shadows update only after moving into another part of the neighbourhood. These limits reduce laptop load. Avoid prolonged playtests on a hot laptop.
+Open http://localhost:8000 in a browser. The game uses the vendored Three.js files and the kitten asset in `dist/`; no build or npm install is required to run it. Press Play to start rendering. The renderer is capped at 24 FPS and pauses when the tab loses focus. Edge smoothing is enabled. Pause → Graphics offers Balanced (default: up to 1.5× display scale / 2.4 million pixels), Sharper (up to 2× / 5 million pixels; more GPU power) and Cooler (up to 1× / 850,000 pixels). Render scale never exceeds the device pixel ratio. This preference is shared between free roam and story, separately from both gameplay saves. Static shadows update only after moving into another part of the neighbourhood. These limits reduce laptop load. Avoid prolonged playtests on a hot laptop.
 
 ## Controls
 
@@ -43,6 +43,7 @@ node tests/explore.test.mjs
 node tests/follow-camera.test.mjs
 node tests/mouse-look.test.mjs
 node tests/procedural.test.mjs
+node tests/graphics.test.mjs
 ```
 
 ## Project map
@@ -51,6 +52,7 @@ node tests/procedural.test.mjs
 - `dist/explore-layout.mjs`, `dist/explore-movement.mjs`: world layout, indexed collision and player movement.
 - `dist/neighbourhood.mjs`: authored asset placement, surfaces and street details.
 - `dist/procedural-buildings.mjs`, `dist/procedural-view.mjs`: deterministic architectural generation and instanced rendering.
+- `dist/graphics.mjs`: shared render scale limits and saved graphics preference.
 - `dist/mouse-look.mjs`, `dist/follow-camera.mjs`: shared mouse capture and collision-aware camera.
 - `dist/story.html`, `dist/style.css`: preserved story shell and interface.
 - `dist/game.js`: 3D world, player, camera, interactions and threats.

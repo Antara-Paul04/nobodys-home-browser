@@ -3,6 +3,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { normaliseState,advanceTime,period,takeResource,sleep,guidance,movementMultiplier } from './story.mjs';
 import { makeFollowCamera } from './follow-camera.mjs';
 import { bindMouseLook } from './mouse-look.mjs';
+import {readGraphicsMode,saveGraphicsMode,renderPixelRatio} from './graphics.mjs';
 import { makeThreat,stepThreat } from './threats.mjs';
 import { stepVertical } from './physics.mjs';
 import * as home from './home.mjs';
@@ -14,9 +15,11 @@ function finishLoading(){if(!buildingsReady||!kittenReady||!homeReady)return;$('
 const SAVE='nobodys-home-web-first-morning-v1';
 const scene=new THREE.Scene(); scene.background=new THREE.Color(0xb8c9bc); scene.fog=new THREE.Fog(0x69746f,15,36);
 const camera=new THREE.PerspectiveCamera(42,innerWidth/innerHeight,.05,100);
-const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'low-power',alpha:false});
+const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'low-power',alpha:false});
+let graphics=readGraphicsMode(localStorage);$('graphics').value=graphics;
+function resizeRenderer(){renderer.setPixelRatio(renderPixelRatio(innerWidth,innerHeight,devicePixelRatio,graphics));renderer.setSize(innerWidth,innerHeight)}
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFShadowMap;renderer.shadowMap.autoUpdate=false;
-renderer.setPixelRatio(Math.min(devicePixelRatio||1,1)); renderer.setSize(innerWidth,innerHeight); renderer.outputColorSpace=THREE.SRGBColorSpace; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=.72; $('game').appendChild(renderer.domElement);
+resizeRenderer(); renderer.outputColorSpace=THREE.SRGBColorSpace; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=.72; $('game').appendChild(renderer.domElement);
 const ambient=new THREE.HemisphereLight(0xf7edce,0x667d6f,2.1); scene.add(ambient); const sun=new THREE.DirectionalLight(0xffe8bb,2); sun.position.set(-5,10,6);scene.add(sun);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-24,right:24,top:24,bottom:-24,near:.1,far:70});sun.shadow.bias=-.0003;sun.shadow.normalBias=.025;
 const mats={}; const mat=(name,color,roughness=1)=>mats[name]??(mats[name]=new THREE.MeshStandardMaterial({color,roughness}));
 const M={floor:mat('floor',0x713e35), plank:mat('plank',0x854237),wall:mat('wall',0xe1cfad),trim:mat('trim',0xf1ead7),dark:mat('dark',0x506359),wood:mat('wood',0x8d644b),cream:mat('cream',0xe7ddca),fabric:mat('fabric',0x8d9b85),pink:mat('pink',0xbd8e7c),bowl:mat('bowl',0x9eb3a1),water:mat('water',0x86aeb0,.3),food:mat('food',0x8c664f),grass:mat('grass',0x9eaf8b),road:mat('road',0x777c6d),pave:mat('pave',0xbeb9a6),leaf:mat('leaf',0x7d9872),trunk:mat('trunk',0x806b53),brick:mat('brick',0xb98c75),gold:mat('gold',0xd3af70),glass:mat('glass',0xb4d7cf)};
@@ -204,11 +207,12 @@ function pause(){if(!started)return;playing=false;keys.clear();mouse.unlock();$(
 function resume(){if(!started)return;$('pause').hidden=true;playing=true;mouse.lock();prev=performance.now();renderLast=0;requestAnimationFrame(frame)}
 $('start-btn').onclick=()=>{started=true;if(state.day===1&&state.nightWarning&&!state.visitorDone)startVisitor();$('start').hidden=true;$('shell').hidden=false;playing=true;mouse.lock();prev=performance.now();requestAnimationFrame(frame);say(state.owner?'The house is still quiet.':'A familiar morning. But something feels different.')};$('pause-btn').onclick=pause;$('help-btn').onclick=pause;$('resume-btn').onclick=resume;
 $('reset-btn').onclick=()=>{try{localStorage.removeItem(SAVE)}catch{}location.reload()};
+$('graphics').onchange=()=>{graphics=saveGraphicsMode(localStorage,$('graphics').value);$('graphics').value=graphics;resizeRenderer();if(mixer)renderOnce()};
 addEventListener('keydown',e=>{if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();if(e.code==='Escape'){if(playing)pause();else if(started)resume();return}if(e.repeat)return;keys.add(e.code);if(e.code==='KeyE')interact();if(e.code==='KeyM'&&playing){say('Mrrrow.');emitNoise(7,'meow')}if(e.code==='KeyH'&&playing)toggleHiding();if(e.code==='Space'&&playing&&!state.hidden&&!jumping&&performance.now()>eatUntil){jumping=true;vertical=5.8;animate('Jump',true)}});addEventListener('keyup',e=>keys.delete(e.code));
 function zoom(amount){cameraDistance=THREE.MathUtils.clamp(cameraDistance+amount,1.5,8)}
 renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();zoom(e.deltaY*.004)},{passive:false});
 $('zoom-in').onclick=()=>zoom(-.7);$('zoom-out').onclick=()=>zoom(.7);
-addEventListener('blur',()=>{if(playing)pause()});document.addEventListener('visibilitychange',()=>{if(document.hidden&&playing)pause()});addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(Math.min(devicePixelRatio||1,1));renderer.setSize(innerWidth,innerHeight);if(!playing&&mixer)renderOnce()});
+addEventListener('blur',()=>{if(playing)pause()});document.addEventListener('visibilitychange',()=>{if(document.hidden&&playing)pause()});addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();resizeRenderer();if(!playing&&mixer)renderOnce()});
 function validPosition(x,z,height){
  if(state.inDark){if(x<20.4||x>27.6||z< -19.1||z> -12.65)return false;if(x>24.1&&x<25.9&&z> -16.9&&z< -15.7)return false;return true}
  if(x< -18||x>18||z< -12.28||z>7.3)return false;

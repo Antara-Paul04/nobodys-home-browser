@@ -5,13 +5,15 @@ import {makeCollisionWorld,spawn,areaName,houses,props,walls,proceduralBuildings
 import {advancePlayer} from './explore-movement.mjs';
 import {makeFollowCamera} from './follow-camera.mjs';
 import {bindMouseLook} from './mouse-look.mjs';
+import {readGraphicsMode,saveGraphicsMode,renderPixelRatio} from './graphics.mjs';
 import * as home from './home.mjs';
 const $=id=>document.getElementById(id),SAVE='nobodys-home-kolkata-explore-v1',world=makeCollisionWorld();
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x858e8b);scene.fog=new THREE.Fog(0x858e8b,25,57);
 const camera=new THREE.PerspectiveCamera(47,innerWidth/innerHeight,.045,85);
-const renderer=new THREE.WebGLRenderer({antialias:false,powerPreference:'low-power'});
-function pixelRatio(){return Math.min(devicePixelRatio||1,1,Math.sqrt(850000/(innerWidth*innerHeight)))}
-renderer.setPixelRatio(pixelRatio());renderer.setSize(innerWidth,innerHeight);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.9;
+const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'low-power'});
+let graphics=readGraphicsMode(localStorage);$('graphics').value=graphics;
+function resizeRenderer(){renderer.setPixelRatio(renderPixelRatio(innerWidth,innerHeight,devicePixelRatio,graphics));renderer.setSize(innerWidth,innerHeight);$('graphics-status').textContent='24 FPS · '+graphics.toUpperCase()}
+resizeRenderer();renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=.9;
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.shadowMap.autoUpdate=false;$('game').appendChild(renderer.domElement);
 const sky=new THREE.HemisphereLight(0xc7d0d2,0x575344,1.65);scene.add(sky);
 const sun=new THREE.DirectionalLight(0xefe0bd,2.1);sun.position.set(-12,19,8);scene.add(sun,sun.target);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);Object.assign(sun.shadow.camera,{left:-20,right:20,top:20,bottom:-20,near:.5,far:65});sun.shadow.bias=-.00025;sun.shadow.normalBias=.025;
@@ -63,14 +65,15 @@ function frame(now){if(!playing)return;requestAnimationFrame(frame);if(now-lastF
  mixer.update(dt);cat.position.set(player.x,player.y,player.z);contact.position.set(player.x,world.ground(player.x,player.z,player.y)+.009,player.z);contact.material.opacity=player.jumping?.35:.8;contact.rotation.z=-cat.rotation.y;
  if(now-lastVisibility>600){neighbourhood.updateVisibility(cat.position);$('area').textContent=areaName(player.x,player.z);lastVisibility=now;updateMap()}
  $('prompt').hidden=climb!==null||(home.inside(player.x,player.z)&&player.y<.74)||Math.abs(player.x-home.window.x)>1.05||Math.abs(player.z-home.window.z)>.3;
- placeCamera(dt);shadows();renderer.render(scene,camera);if(diagnostics){diagnosticFrames++;if(now-diagnosticTime>2000){diagnostics.textContent=Math.round(diagnosticFrames*1000/(now-diagnosticTime))+' fps · '+renderer.info.render.calls+' draws · '+Math.round(renderer.info.render.triangles/1000)+'k triangles · camera '+camera.position.distanceTo(target).toFixed(2)+'m'+(cameraConfined?' tight':'');diagnosticFrames=0;diagnosticTime=now}}if(now-lastSave>5000){save();lastSave=now}
+ placeCamera(dt);shadows();renderer.render(scene,camera);if(diagnostics){diagnosticFrames++;if(now-diagnosticTime>2000){diagnostics.textContent=Math.round(diagnosticFrames*1000/(now-diagnosticTime))+' fps · '+renderer.info.render.calls+' draws · '+Math.round(renderer.info.render.triangles/1000)+'k triangles · '+renderer.domElement.width+'×'+renderer.domElement.height+' · camera '+camera.position.distanceTo(target).toFixed(2)+'m'+(cameraConfined?' tight':'');diagnosticFrames=0;diagnosticTime=now}}if(now-lastSave>5000){save();lastSave=now}
 }
 $('start-btn').onclick=()=>{started=true;$('start').hidden=true;$('hud').hidden=false;resume();say('Take your time. The lanes join up.')};$('pause-btn').onclick=pause;$('resume-btn').onclick=resume;$('map-btn').onclick=map;$('close-map').onclick=map;
 $('home-btn').onclick=()=>{Object.assign(player,spawn,{velocity:0,jumping:false});climb=null;nap=false;yaw=1.2;distance=2.8;save();renderStill();resume()};$('light').onchange=()=>{light=$('light').value;lighting();renderStill();save()};
+$('graphics').onchange=()=>{graphics=saveGraphicsMode(localStorage,$('graphics').value);$('graphics').value=graphics;resizeRenderer();if(neighbourhood)renderStill()};
 function zoom(v){distance=THREE.MathUtils.clamp(distance+v,1.2,6)}$('zoom-in').onclick=()=>zoom(-.5);$('zoom-out').onclick=()=>zoom(.5);
 addEventListener('keydown',e=>{if(['Space','Tab','ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code))e.preventDefault();if(e.code==='Escape'){if(playing)pause();else if(started)resume();return}if(e.repeat)return;if(e.code==='Tab'&&started){map();return}if(!playing||!$('map').hidden)return;keys.add(e.code);if(e.code==='Space')jumpQueued=true;if(e.code==='KeyE')interact();if(e.code==='KeyM')say('Mrrrow.');if(e.code==='KeyR'){Object.assign(player,lastSafe,{velocity:0,jumping:false});climb=null;cameraRig.reset();say('Back to a clear spot.')}});addEventListener('keyup',e=>keys.delete(e.code));
 renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();zoom(e.deltaY*.003)},{passive:false});
-addEventListener('blur',()=>{if(playing)pause()});document.addEventListener('visibilitychange',()=>{if(document.hidden&&playing)pause()});addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setPixelRatio(pixelRatio());renderer.setSize(innerWidth,innerHeight);if(neighbourhood&&!playing)renderStill()});
+addEventListener('blur',()=>{if(playing)pause()});document.addEventListener('visibilitychange',()=>{if(document.hidden&&playing)pause()});addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();resizeRenderer();if(neighbourhood&&!playing)renderStill()});
 try{
  const kitten=await new GLTFLoader().loadAsync('./assets/kitten.glb');const model=kitten.scene;model.scale.setScalar(home.SCALE);model.updateMatrixWorld(true);const bounds=new THREE.Box3().setFromObject(model);model.position.set(-(bounds.min.x+bounds.max.x)/2,-bounds.min.y,-(bounds.min.z+bounds.max.z)/2);cat.add(model);
  model.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false}});mixer=new THREE.AnimationMixer(model);for(const clip of kitten.animations){if(clip.name==='Jump')clip.tracks=clip.tracks.filter(t=>!t.name.endsWith('Hips.position'));actions[clip.name]=mixer.clipAction(clip);if(clip.name==='Jump'){actions[clip.name].setLoop(THREE.LoopOnce,1);actions[clip.name].clampWhenFinished=true}}animate('Idle');mixer.update(0);

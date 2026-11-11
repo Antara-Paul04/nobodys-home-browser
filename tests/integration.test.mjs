@@ -1,4 +1,5 @@
 import * as home from '../dist/home.mjs';
+import {readGraphicsMode,saveGraphicsMode,renderPixelRatio} from '../dist/graphics.mjs';
 import fs from 'node:fs';import assert from 'node:assert/strict';import * as three from '../dist/vendor/three/build/three.module.js';
 import {fileURLToPath} from 'node:url';
 const dir=fileURLToPath(new URL('..',import.meta.url));
@@ -9,9 +10,9 @@ class Loader{load(path,ok){if(!path.includes('kitten.glb'))return;let scene=new 
 const document={getElementById:node,addEventListener(){},hidden:false};const storage={getItem:k=>saved[k]??null,setItem:(k,v)=>saved[k]=v,removeItem:k=>delete saved[k]};
 let code=fs.readFileSync(dir+'/dist/game.js','utf8').replace(/^import .*?;\s*$/gm,'');
 code+='\nreturn {state,catRoot,items,interact,nearby,itemLabel,toggleHiding,startVisitor,updateThreats,emitNoise,validPosition,questUI,save,get dog(){return dog},get infected(){return infected},get visitorActive(){return visitorActive}, get noiseTarget(){return noiseTarget},start(){playing=true},setY(v){y=v}, forceFrame(t){frame(t)},get visible(){return catRoot.visible}}';
-const create=new Function('makeFollowCamera','bindMouseLook','home','THREE','GLTFLoader','normaliseState','advanceTime','period','takeResource','sleep','guidance','movementMultiplier','constrainCamera','stepVertical','makeThreat','stepThreat','document','localStorage','addEventListener','innerWidth','innerHeight','devicePixelRatio','requestAnimationFrame','setTimeout','clearTimeout','performance',code);
+const create=new Function('readGraphicsMode','saveGraphicsMode','renderPixelRatio','makeFollowCamera','bindMouseLook','home','THREE','GLTFLoader','normaliseState','advanceTime','period','takeResource','sleep','guidance','movementMultiplier','constrainCamera','stepVertical','makeThreat','stepThreat','document','localStorage','addEventListener','innerWidth','innerHeight','devicePixelRatio','requestAnimationFrame','setTimeout','clearTimeout','performance',code);
 const {makeFollowCamera}=await import('../dist/follow-camera.mjs');
-const api=create(makeFollowCamera,()=>({lock(){},unlock(){}}),home,T,Loader,story.normaliseState,story.advanceTime,story.period,story.takeResource,story.sleep,story.guidance,story.movementMultiplier,camera.constrainCamera,physics.stepVertical,threats.makeThreat,threats.stepThreat,document,storage,()=>{},800,600,1,()=>{},()=>0,()=>{},{now:()=>10000});
+const api=create(readGraphicsMode,saveGraphicsMode,renderPixelRatio,makeFollowCamera,()=>({lock(){},unlock(){}}),home,T,Loader,story.normaliseState,story.advanceTime,story.period,story.takeResource,story.sleep,story.guidance,story.movementMultiplier,camera.constrainCamera,physics.stepVertical,threats.makeThreat,threats.stepThreat,document,storage,()=>{},800,600,1,()=>{},()=>0,()=>{},{now:()=>10000});
 let n=0,failed=0;function check(label,fn){try{fn();console.log('PASS '+label);n++}catch(e){failed++;console.log('FAIL '+label+' — '+e.message)}}
 const move=(x,z,y=home.inside(x,z)?home.spawn.y:0)=>{api.catRoot.position.set(x,y,z);api.setY(y)};api.start();
 check('opening owner clue and guidance',()=>{move(home.bed.x,home.bed.z);assert.equal(api.nearby().type,'bed');api.interact();assert.equal(api.state.owner,true)});
