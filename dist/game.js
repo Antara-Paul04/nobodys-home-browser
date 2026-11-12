@@ -7,6 +7,7 @@ import {readGraphicsMode,saveGraphicsMode,renderPixelRatio} from './graphics.mjs
 import { makeThreat,stepThreat } from './threats.mjs';
 import { stepVertical } from './physics.mjs';
 import * as home from './home.mjs';
+import {prepareGait,WALK_SPEED,RUN_SPEED} from './kitten-gait.mjs';
 
 const $ = id => document.getElementById(id);
 let buildingsReady=false,kittenReady=false,homeReady=false;
@@ -122,6 +123,10 @@ box(21.3,.2,-17.8,.8,.4,.7,M.dark);cylinder(22.0,.12,-14.6,.11,.24,M.cream);cyli
 const darkInfected=infected.clone();scene.add(darkInfected);darkInfected.position.set(26,0,-18);darkInfected.visible=false;
 const darkFigure=infected.clone();scene.add(darkFigure);darkFigure.position.set(27.25,0,-18.6);darkFigure.visible=false;
 const catRoot=new THREE.Group();scene.add(catRoot);let mixer,actions={},currentAction='';
+// Same gait as free roam: eased starts and stops, and legs that keep time with the ground covered.
+let gait=null,pace=0,wasRunning=false;const heading=new THREE.Vector3();
+// `story.html?inspect` exposes the kitten's motion for checking the gait.
+if(typeof location!=='undefined'&&new URLSearchParams(location.search).has('inspect'))window.__story={get state(){return {x:catRoot.position.x,z:catRoot.position.z,pace,animation:currentAction,rate:actions[currentAction]?.timeScale,gait:gait?.natural,slowed:movementMultiplier(state)}}};
 let state=normaliseState({homeLayout:2,x:home.spawn.x,z:home.spawn.z,y:home.spawn.y,food:55,water:62,owner:false,ate:false,drank:false,tv:false,outside:false});
 try{const loaded=JSON.parse(localStorage.getItem(SAVE));if(loaded&&typeof loaded.x==='number'&&Number.isFinite(loaded.x))state=normaliseState({...state,...loaded,homeLayout:loaded.homeLayout??1})}catch{}
 home.migrate(state);
@@ -189,12 +194,12 @@ function updateThreats(dt){
  if(visitorActive){advanceAgent(visitorThreat,infected);if(visitorThreat.mode==='idle')infected.rotation.y=Math.sin(visitorTimer*1.5)*.16}
  else if(state.day>=2){advanceAgent(infectedThreat,infected);if(outside&&Math.hypot(infected.position.x-catRoot.position.x,infected.position.z-catRoot.position.z)<5)state.seenInfected=true}
  advanceAgent(dogThreat,dog);
- if(state.inDark&&state.darkAwake&&!state.hidden){const dx=catRoot.position.x-darkInfected.position.x,dz=catRoot.position.z-darkInfected.position.z,d=Math.hypot(dx,dz);if(d>.6){darkInfected.position.x+=dx/d*.65*dt;darkInfected.position.z+=dz/d*.65*dt;darkInfected.rotation.y=Math.atan2(dx,dz)}if(d<.7&&threatCooldown<=0){state.inDark=false;state.dangerLearned=true;state.noiseLesson=true;catRoot.position.set(-2.6,0,-11);threatCooldown=5;updateLighting();say('Hands. Back outside.',5000);save()}}
+ if(state.inDark&&state.darkAwake&&!state.hidden){const dx=catRoot.position.x-darkInfected.position.x,dz=catRoot.position.z-darkInfected.position.z,d=Math.hypot(dx,dz);if(d>.6){darkInfected.position.x+=dx/d*.34*dt;darkInfected.position.z+=dz/d*.34*dt;darkInfected.rotation.y=Math.atan2(dx,dz)}if(d<.7&&threatCooldown<=0){state.inDark=false;state.dangerLearned=true;state.noiseLesson=true;catRoot.position.set(-2.6,0,-11);threatCooldown=5;updateLighting();say('Hands. Back outside.',5000);save()}}
  
 }
 let noiseHintShown=false;function sayOnceNoise(){if(!noiseHintShown){noiseHintShown=true;say('The sound brought it closer.',5000)}}
 function animate(name,force=false){if(currentAction===name&&!force)return;let next=actions[name]||actions.Idle;if(!next)return;const previous=actions[currentAction];if(previous&&previous!==next)previous.fadeOut(.18);next.reset().fadeIn(.18).play();currentAction=name}
-new GLTFLoader().load('./assets/kitten.glb',gltf=>{const model=gltf.scene;catRoot.add(model);model.scale.setScalar(home.SCALE);model.updateMatrixWorld(true);const fitted=new THREE.Box3().setFromObject(model);model.position.y-=fitted.min.y;model.position.x-=(fitted.min.x+fitted.max.x)/2;model.position.z-=(fitted.min.z+fitted.max.z)/2;model.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false}});mixer=new THREE.AnimationMixer(model);for(const clip of gltf.animations){if(clip.name==='Jump')clip.tracks=clip.tracks.filter(t=>!t.name.endsWith('Hips.position'));actions[clip.name]=mixer.clipAction(clip);if(['Jump','LieDown','WakeUp'].includes(clip.name)){actions[clip.name].setLoop(THREE.LoopOnce,1);actions[clip.name].clampWhenFinished=true}}animate('Idle');catRoot.position.set(state.x,y,state.z);questUI();updateLighting();kittenReady=true;finishLoading();renderOnce();},undefined,error=>{$('loading-detail').textContent='The kitten could not be loaded. Please reload the page.';console.error(error)});
+new GLTFLoader().load('./assets/kitten.glb',gltf=>{const model=gltf.scene;catRoot.add(model);model.scale.setScalar(home.SCALE);model.updateMatrixWorld(true);const fitted=new THREE.Box3().setFromObject(model);model.position.y-=fitted.min.y;model.position.x-=(fitted.min.x+fitted.max.x)/2;model.position.z-=(fitted.min.z+fitted.max.z)/2;model.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false}});mixer=new THREE.AnimationMixer(model);for(const clip of gltf.animations){if(clip.name==='Jump')clip.tracks=clip.tracks.filter(t=>!t.name.endsWith('Hips.position'));actions[clip.name]=mixer.clipAction(clip);if(['Jump','LieDown','WakeUp'].includes(clip.name)){actions[clip.name].setLoop(THREE.LoopOnce,1);actions[clip.name].clampWhenFinished=true}}gait=prepareGait(model,gltf.animations,home.SCALE);animate('Idle');catRoot.position.set(state.x,y,state.z);questUI();updateLighting();kittenReady=true;finishLoading();renderOnce();},undefined,error=>{$('loading-detail').textContent='The kitten could not be loaded. Please reload the page.';console.error(error)});
 // Keep the walls opaque. Move the camera to the near side of a wall when needed.
 function placeCamera(target,desired,dt=1){
  const d=target.distanceTo(desired),solids=cameraSolids.filter(s=>target.x>s.minX-d&&target.x<s.maxX+d&&target.z>s.minZ-d&&target.z<s.maxZ+d);
@@ -223,7 +228,11 @@ function validPosition(x,z,height){
 }
 function frame(now){if(!playing)return;requestAnimationFrame(frame);if(now-renderLast<1000/24)return;const dt=Math.min((now-prev)/1000,.08);prev=now;renderLast=now;
  let a=(keys.has('KeyD')||keys.has('ArrowRight')?1:0)-(keys.has('KeyA')||keys.has('ArrowLeft')?1:0);let b=(keys.has('KeyW')||keys.has('ArrowUp')?1:0)-(keys.has('KeyS')||keys.has('ArrowDown')?1:0);let move=new THREE.Vector3();if(performance.now()>eatUntil&&!state.hidden&&!windowClimb){const forward=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw)),right=new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));move.addScaledVector(forward,b).addScaledVector(right,a);if(move.lengthSq()>0)move.normalize()}
- const running=keys.has('ShiftLeft')||keys.has('ShiftRight');const speed=(running?2.8:1.55)*movementMultiplier(state);const beforeX=catRoot.position.x,beforeZ=catRoot.position.z;let nx=catRoot.position.x+move.x*speed*dt,nz=catRoot.position.z+move.z*speed*dt;if(validPosition(nx,catRoot.position.z,y))catRoot.position.x=nx;if(validPosition(catRoot.position.x,nz,y))catRoot.position.z=nz;
+ const running=keys.has('ShiftLeft')||keys.has('ShiftRight'),wants=move.lengthSq()>0,free=performance.now()>eatUntil&&!state.hidden&&!windowClimb;
+ // Ease into and out of motion, keeping the last heading while slowing, so the kitten never snaps.
+ if(wants){heading.copy(move);wasRunning=running}
+ pace+=((wants?1:0)-pace)*Math.min(1,dt*(wants?9:12));if(!free||(!wants&&pace<.06))pace=0;
+ const speed=((wants?running:wasRunning)?RUN_SPEED:WALK_SPEED)*movementMultiplier(state)*pace;const beforeX=catRoot.position.x,beforeZ=catRoot.position.z;let nx=catRoot.position.x+heading.x*speed*dt,nz=catRoot.position.z+heading.z*speed*dt;if(validPosition(nx,catRoot.position.z,y))catRoot.position.x=nx;if(validPosition(catRoot.position.x,nz,y))catRoot.position.z=nz;
  if(move.lengthSq()>.001){const target=Math.atan2(move.x,move.z);let diff=Math.atan2(Math.sin(target-catRoot.rotation.y),Math.cos(target-catRoot.rotation.y));catRoot.rotation.y+=diff*Math.min(1,dt*9)}
  if(windowClimb){
   const c=windowClimb,target=c.points[0];c.elapsed+=dt;const t=Math.min(1,c.elapsed/.45),f=t*t*(3-2*t);
@@ -239,8 +248,9 @@ function frame(now){if(!playing)return;requestAnimationFrame(frame);if(now-rende
  }
  }
  catRoot.position.y=y;
- const moved=Math.hypot(catRoot.position.x-beforeX,catRoot.position.z-beforeZ)>.001;
- if(!jumping){if(performance.now()<eatUntil)animate(holdClip);else if(moved)animate(running?'Run':'Walk');else animate('Idle')}
+ const travelled=Math.hypot(catRoot.position.x-beforeX,catRoot.position.z-beforeZ),moved=travelled>.001,groundSpeed=travelled/Math.max(dt,1e-4),gaitName=groundSpeed>WALK_SPEED*1.15?'Run':'Walk';   // a hungry kitten's slow run is still a run: faster than walking legs can keep up with
+ if(!jumping){if(performance.now()<eatUntil)animate(holdClip);else if(moved&&groundSpeed>.06)animate(gaitName);else animate('Idle')}
+ if(gait&&!jumping&&moved)for(const name of ['Walk','Run'])if(actions[name])actions[name].timeScale=gait.rate(name,groundSpeed);
  if(mixer)mixer.update(dt);state.food=Math.max(0,state.food-dt*.025);state.water=Math.max(0,state.water-dt*.035);
  for(const event of advanceTime(state,dt)){if(event==='visitor')startVisitor();if(event==='dawn')onDawn()}
  updateThreats(dt);updateRain(now);

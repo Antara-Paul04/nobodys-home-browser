@@ -16,6 +16,8 @@ for(const [name,speed] of [['Walk',WALK_SPEED],['Run',RUN_SPEED]]){
  assert.ok(Math.abs(gait.natural[name]*rate-speed)/speed<.05,`${name}: planted paws move at body speed`);
  assert.ok(cycles<5.2,`${name}: at most about five steps a second, readable at 24 frames a second`);
 }
+// No in-between speed slides either (a hungry kitten, or one brushing along a wall while running): above what walking legs can match, it runs.
+for(let speed=.15;speed<=RUN_SPEED;speed+=.05){const name=speed>.63?'Run':'Walk';assert.ok(Math.abs(gait.natural[name]*gait.rate(name,speed)-speed)/speed<.05,`paws keep pace at ${speed.toFixed(2)}`)}
 assert.ok(gait.rate('Walk',.05)>=.7,'legs never freeze mid-step while easing to a stop');
 // The lengthened gait still fits the kitten's collision body.
 const mixer=new THREE.AnimationMixer(model.scene);

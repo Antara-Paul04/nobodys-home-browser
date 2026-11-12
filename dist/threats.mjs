@@ -1,5 +1,9 @@
 import * as home from './home.mjs';
 // Lightweight threat behaviour; no rendering or browser APIs.
+// Pace is set against the kitten's own (it walks at .55 and runs at 1.45 units a second): the infected is a
+// little slower than a walking kitten, the dog is faster than a walk and slower than a run. Reaction times
+// are stretched in the same proportion, so a chase covers the same ground it always did, at a kitten's pace.
+export const PACE={dog:{chase:1,search:.52,warn:1.7},infected:{chase:.5,search:.39,warn:2.5},home:.42,patrol:.18,lose:5.8,searchFor:13.5,rest:13.5};
 export const STREET_BLOCKERS=[
  {minX:3.3,maxX:4.3,minZ:-5.85,maxZ:-5.0},
  {minX:4.5,maxX:5.5,minZ:-7.7,maxZ:-6.7},
@@ -21,19 +25,19 @@ export function stepThreat(agent,dt,player,noise){
  if(canSee&&agent.cooldown<=0&&agent.mode!=='alert'&&agent.mode!=='chase'){agent.mode='alert';agent.timer=0;agent.lastKnown={x:player.x,z:player.z}}
  if(agent.mode==='alert'){
   if(canSee)agent.lastKnown={x:player.x,z:player.z};
-  if(agent.timer>(agent.kind==='dog'?.9:1.3)){agent.mode=canSee?'chase':'investigate';agent.timer=0}
+  if(agent.timer>PACE[agent.kind].warn){agent.mode=canSee?'chase':'investigate';agent.timer=0}
  }else if(agent.mode==='chase'){
   if(canSee){agent.lastKnown={x:player.x,z:player.z};agent.timer=0}
-  if(!canSee&&agent.timer>3){agent.mode='return';agent.timer=0;return {escaped:true,noticedNoise}}
-  if(canSee&&distance<.62){agent.mode='return';agent.cooldown=7;agent.timer=0;return {caught:true,noticedNoise}}
-  if(agent.lastKnown)moveToward(agent,agent.lastKnown,agent.kind==='dog'?1.9:1.35,dt)
+  if(!canSee&&agent.timer>PACE.lose){agent.mode='return';agent.timer=0;return {escaped:true,noticedNoise}}
+  if(canSee&&distance<.62){agent.mode='return';agent.cooldown=PACE.rest;agent.timer=0;return {caught:true,noticedNoise}}
+  if(agent.lastKnown)moveToward(agent,agent.lastKnown,PACE[agent.kind].chase,dt)
  }else if(agent.mode==='investigate'){
-  if(agent.lastKnown)moveToward(agent,agent.lastKnown,agent.kind==='dog'?1.0:.75,dt);
-  if(agent.timer>7){agent.mode='return';agent.timer=0}
+  if(agent.lastKnown)moveToward(agent,agent.lastKnown,PACE[agent.kind].search,dt);
+  if(agent.timer>PACE.searchFor){agent.mode='return';agent.timer=0}
  }else if(agent.mode==='return'){
-  moveToward(agent,agent.home,.8,dt);if(Math.hypot(p.x-agent.home.x,p.z-agent.home.z)<.15){agent.mode=agent.kind==='dog'?'patrol':'idle';agent.timer=0}
+  moveToward(agent,agent.home,PACE.home,dt);if(Math.hypot(p.x-agent.home.x,p.z-agent.home.z)<.15){agent.mode=agent.kind==='dog'?'patrol':'idle';agent.timer=0}
  }else if(agent.mode==='patrol'){
-  const goal={x:agent.home.x+(agent.patrol?2:-1),z:agent.home.z};moveToward(agent,goal,.35,dt);
+  const goal={x:agent.home.x+(agent.patrol?2:-1),z:agent.home.z};moveToward(agent,goal,PACE.patrol,dt);
   if(Math.hypot(p.x-goal.x,p.z-goal.z)<.15){agent.patrol=1-agent.patrol;agent.timer=0}
  }
  if(agent.lastKnown&&['alert','chase','investigate'].includes(agent.mode)){const x=agent.lastKnown.x-p.x,z=agent.lastKnown.z-p.z;if(Math.hypot(x,z)>.01)p.rotation=Math.atan2(x,z)}

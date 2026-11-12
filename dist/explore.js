@@ -74,7 +74,7 @@ function frame(now){if(!playing)return;requestAnimationFrame(frame);if(now-lastF
  }jumpQueued=false;
  const moved=Math.hypot(oldX-player.x,oldZ-player.z)>.0005;if(!player.jumping&&moved&&Math.hypot(player.x-lastSafe.x,player.z-lastSafe.z)>1.2&&world.valid(player.x,player.z,player.y,false)&&[[.3,0],[-.3,0],[0,.3],[0,-.3]].every(([x,z])=>world.valid(player.x+x,player.z+z,player.y,false)))lastSafe={...player};if(moved||player.jumping)nap=false;
  if(moved){const angle=Math.atan2(player.x-oldX,player.z-oldZ),diff=Math.atan2(Math.sin(angle-cat.rotation.y),Math.cos(angle-cat.rotation.y));cat.rotation.y+=diff*Math.min(1,dt*12)}
- const groundSpeed=Math.hypot(player.x-oldX,player.z-oldZ)/Math.max(dt,1e-4),gaitName=groundSpeed>.95?'Run':'Walk';
+ const groundSpeed=Math.hypot(player.x-oldX,player.z-oldZ)/Math.max(dt,1e-4),gaitName=groundSpeed>.63?'Run':'Walk';
  if(player.jumping){if(!wasJumping)animate('Jump')}else animate(nap?'Sleep':moved&&groundSpeed>.06?gaitName:'Idle');
  // Legs keep time with the ground actually covered, so paws do not slide.
  if(gait&&!player.jumping&&moved)for(const name of ['Walk','Run'])if(actions[name])actions[name].timeScale=gait.rate(name,groundSpeed);
