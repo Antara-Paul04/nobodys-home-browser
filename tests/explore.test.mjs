@@ -42,8 +42,8 @@ assert.ok(fs.readFileSync(new URL('../dist/story.html',import.meta.url),'utf8').
 console.log(`Exploration: all ${places.length} places connect through narrow lanes and cat gaps; taxi, tube well, banyan and pond block movement; benches and jumps support the kitten; authored shops, exported props and isolated saves verified.`);
 // The storage trunk blocks a straight line under the bed, but the actual side route remains usable.
 const underBed={x:-2.025,z:2.075,y:.3375,velocity:0,jumping:false};
-for(let i=0;i<11;i++)advancePlayer(underBed,{x:0,z:1},1/24,world);
-for(let i=0;i<44;i++)advancePlayer(underBed,{x:1,z:0},1/24,world);
+for(let i=0;i<21;i++)advancePlayer(underBed,{x:0,z:1},1/24,world);
+for(let i=0;i<84;i++)advancePlayer(underBed,{x:1,z:0},1/24,world);
 assert.ok(underBed.x>-.2,'kitten can walk around the trunk and out from under the bed');
 // A low step under a roof must not lift the kitten into the roof and strand it.
 const tightWorld={valid(x,z,y){return x<.5||y+.225<=.31},ground(x,z){return x<.5?0:.1},ceiling(x,z,a,b){return b},landing(){return null}};

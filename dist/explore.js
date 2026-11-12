@@ -7,6 +7,7 @@ import {makeFollowCamera} from './follow-camera.mjs';
 import {bindMouseLook} from './mouse-look.mjs';
 import {readGraphicsMode,saveGraphicsMode,renderPixelRatio} from './graphics.mjs';
 import * as home from './home.mjs';
+import {prepareGait} from './kitten-gait.mjs';
 const $=id=>document.getElementById(id),SAVE='nobodys-home-kolkata-explore-v2',world=makeCollisionWorld();
 const scene=new THREE.Scene();scene.background=new THREE.Color(0xbcbdb3);scene.fog=new THREE.Fog(0xbcbdb3,12,58);
 const camera=new THREE.PerspectiveCamera(47,innerWidth/innerHeight,.045,85);
@@ -22,12 +23,13 @@ const faces=Array.from({length:6},(_,i)=>{const c=document.createElement('canvas
 const env=new THREE.CubeTexture(faces);env.needsUpdate=true;env.colorSpace=THREE.SRGBColorSpace;scene.environment=env;scene.environmentIntensity=.35;
 let light='overcast',player={...spawn,velocity:0,jumping:false},yaw=-1.45,pitch=.3,distance=2.8;
 try{const s=JSON.parse(localStorage.getItem(SAVE));if(s&&Number.isFinite(s.x)&&Number.isFinite(s.z)&&Number.isFinite(s.y)&&world.valid(s.x,s.z,s.y,false)){Object.assign(player,{x:s.x,z:s.z,y:s.y});yaw=Number.isFinite(s.yaw)?s.yaw:yaw;pitch=THREE.MathUtils.clamp(s.pitch||pitch,.15,1.1);distance=THREE.MathUtils.clamp(s.distance||distance,1.2,6);light=s.light==='dusk'?'dusk':'overcast'}}catch{}
+let gait=null,pace=0,heading={x:0,z:0},wasRunning=false;
 let playing=false,started=false,mixer,actions={},current='',neighbourhood,prev=0,lastFrame=0,lastSave=0,lastVisibility=0,jumpQueued=false,climb=null,nap=false,toastTimer,shadowX=Infinity,shadowZ=Infinity;
 const cat=new THREE.Group();scene.add(cat);cat.position.set(player.x,player.y,player.z);cat.rotation.y=-Math.PI/2;
 const contactCanvas=document.createElement('canvas');contactCanvas.width=contactCanvas.height=64;const cc=contactCanvas.getContext('2d'),cg=cc.createRadialGradient(32,32,0,32,32,32);cg.addColorStop(0,'rgba(12,17,12,.4)');cg.addColorStop(1,'rgba(12,17,12,0)');cc.fillStyle=cg;cc.fillRect(0,0,64,64);
 const contact=new THREE.Mesh(new THREE.PlaneGeometry(.28,.37),new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(contactCanvas),transparent:true,depthWrite:false}));contact.rotation.x=-Math.PI/2;scene.add(contact);
 const diagnostics=new URLSearchParams(location.search).has('inspect')?document.createElement('output'):null;let diagnosticFrames=0,diagnosticTime=0;
-if(diagnostics)window.__explore={look(x,z,newYaw,newPitch=.3,newDistance=2.8,y){Object.assign(player,{x,z,y:y??world.ground(x,z,5),velocity:0,jumping:false});yaw=newYaw;pitch=newPitch;distance=newDistance;renderStill();return renderer.info.render},light(v){light=v;lighting();renderStill()},get info(){return renderer.info.render}};
+if(diagnostics)window.__explore={look(x,z,newYaw,newPitch=.3,newDistance=2.8,y){Object.assign(player,{x,z,y:y??world.ground(x,z,5),velocity:0,jumping:false});yaw=newYaw;pitch=newPitch;distance=newDistance;renderStill();return renderer.info.render},light(v){light=v;lighting();renderStill()},get info(){return renderer.info.render},get state(){return {x:player.x,z:player.z,y:player.y,pace,animation:current,rate:actions[current]?.timeScale,gait:gait?.natural}}};
 if(diagnostics){diagnostics.style.cssText='position:fixed;left:24px;top:65px;color:white;font:11px monospace;background:#111b;padding:6px;z-index:6';document.body.appendChild(diagnostics)}
 const keys=new Set(),target=new THREE.Vector3(),ray=new THREE.Raycaster(),cameraRig=makeFollowCamera();
 const faded=new Map();let cameraConfined=false,lastSafe={...spawn};
@@ -64,10 +66,18 @@ function frame(now){if(!playing)return;requestAnimationFrame(frame);if(now-lastF
  const a=(keys.has('KeyD')||keys.has('ArrowRight')?1:0)-(keys.has('KeyA')||keys.has('ArrowLeft')?1:0),b=(keys.has('KeyW')||keys.has('ArrowUp')?1:0)-(keys.has('KeyS')||keys.has('ArrowDown')?1:0),dx=-Math.sin(yaw)*b+Math.cos(yaw)*a,dz=-Math.cos(yaw)*b-Math.sin(yaw)*a,running=keys.has('ShiftLeft')||keys.has('ShiftRight');
  const oldX=player.x,oldZ=player.z,wasJumping=player.jumping;
  if(climb){const c=climb,end=c.points[0];c.elapsed+=dt;const t=Math.min(1,c.elapsed/.5),f=t*t*(3-2*t);for(const k of ['x','y','z'])player[k]=c.start[k]+(end[k]-c.start[k])*f;if(t===1){c.points.shift();c.start={...end};c.elapsed=0;if(!c.points.length)climb=null}}
- else advancePlayer(player,{x:dx,z:dz,running,jump:jumpQueued},dt,world);jumpQueued=false;
+ else{
+  // Ease into and out of motion, and keep the last heading while slowing, so the kitten never snaps.
+  const wants=Math.hypot(dx,dz)>0;if(wants){heading.x=dx;heading.z=dz;wasRunning=running}
+  pace+=((wants?1:0)-pace)*Math.min(1,dt*(wants?9:12));if(!wants&&pace<.06)pace=0;
+  advancePlayer(player,{x:pace?heading.x:0,z:pace?heading.z:0,running:wants?running:wasRunning,pace,jump:jumpQueued},dt,world);
+ }jumpQueued=false;
  const moved=Math.hypot(oldX-player.x,oldZ-player.z)>.0005;if(!player.jumping&&moved&&Math.hypot(player.x-lastSafe.x,player.z-lastSafe.z)>1.2&&world.valid(player.x,player.z,player.y,false)&&[[.3,0],[-.3,0],[0,.3],[0,-.3]].every(([x,z])=>world.valid(player.x+x,player.z+z,player.y,false)))lastSafe={...player};if(moved||player.jumping)nap=false;
  if(moved){const angle=Math.atan2(player.x-oldX,player.z-oldZ),diff=Math.atan2(Math.sin(angle-cat.rotation.y),Math.cos(angle-cat.rotation.y));cat.rotation.y+=diff*Math.min(1,dt*12)}
- if(player.jumping){if(!wasJumping)animate('Jump')}else animate(nap?'Sleep':moved?(running?'Run':'Walk'):'Idle');
+ const groundSpeed=Math.hypot(player.x-oldX,player.z-oldZ)/Math.max(dt,1e-4),gaitName=groundSpeed>.95?'Run':'Walk';
+ if(player.jumping){if(!wasJumping)animate('Jump')}else animate(nap?'Sleep':moved&&groundSpeed>.06?gaitName:'Idle');
+ // Legs keep time with the ground actually covered, so paws do not slide.
+ if(gait&&!player.jumping&&moved)for(const name of ['Walk','Run'])if(actions[name])actions[name].timeScale=gait.rate(name,groundSpeed);
  mixer.update(dt);cat.position.set(player.x,player.y,player.z);contact.position.set(player.x,world.ground(player.x,player.z,player.y)+.009,player.z);contact.material.opacity=player.jumping?.35:.8;contact.rotation.z=-cat.rotation.y;
  if(now-lastVisibility>600){neighbourhood.updateVisibility(cat.position);$('area').textContent=areaName(player.x,player.z);lastVisibility=now;updateMap()}
  $('prompt').hidden=climb!==null||(home.inside(player.x,player.z)&&player.y<.74)||Math.abs(player.x-home.window.x)>1.05||Math.abs(player.z-home.window.z)>.3;
@@ -82,6 +92,7 @@ renderer.domElement.addEventListener('wheel',e=>{e.preventDefault();zoom(e.delta
 addEventListener('blur',()=>{if(playing)pause()});document.addEventListener('visibilitychange',()=>{if(document.hidden&&playing)pause()});addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();resizeRenderer();if(neighbourhood&&!playing)renderStill()});
 try{
  const kitten=await new GLTFLoader().loadAsync('./assets/kitten.glb');const model=kitten.scene;model.scale.setScalar(home.SCALE);model.updateMatrixWorld(true);const bounds=new THREE.Box3().setFromObject(model);model.position.set(-(bounds.min.x+bounds.max.x)/2,-bounds.min.y,-(bounds.min.z+bounds.max.z)/2);cat.add(model);
- model.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false}});mixer=new THREE.AnimationMixer(model);for(const clip of kitten.animations){if(clip.name==='Jump')clip.tracks=clip.tracks.filter(t=>!t.name.endsWith('Hips.position'));actions[clip.name]=mixer.clipAction(clip);if(clip.name==='Jump'){actions[clip.name].setLoop(THREE.LoopOnce,1);actions[clip.name].clampWhenFinished=true}}animate('Idle');mixer.update(0);
+ model.traverse(o=>{if(o.isMesh){o.castShadow=false;o.receiveShadow=false}});mixer=new THREE.AnimationMixer(model);for(const clip of kitten.animations){if(clip.name==='Jump')clip.tracks=clip.tracks.filter(t=>!t.name.endsWith('Hips.position'));actions[clip.name]=mixer.clipAction(clip);if(clip.name==='Jump'){actions[clip.name].setLoop(THREE.LoopOnce,1);actions[clip.name].clampWhenFinished=true}}gait=prepareGait(model,kitten.animations,home.SCALE);
+ animate('Idle');mixer.update(0);
  neighbourhood=await buildNeighbourhood(scene,text=>$('loading-detail').textContent=text);lighting();makeMap();renderStill();$('loading').hidden=true;$('start').hidden=false;
 }catch(error){console.error(error);$('loading-detail').textContent='The neighbourhood could not load. Please refresh to try again.'}

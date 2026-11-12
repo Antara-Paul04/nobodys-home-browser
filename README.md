@@ -14,7 +14,7 @@ Open http://localhost:8000 in a browser. The game uses the vendored Three.js fil
 
 ## Controls
 
-Free roam starts in the gali outside home. WASD moves, Shift runs, Space jumps, moving the mouse looks around, and scrolling or +/− zooms. Click Explore/Continue to capture the mouse; Escape releases it and pauses. Browsers that deny mouse capture fall back to ordinary mouse movement without holding a button. Tab opens the map. E climbs through the bedroom window when reachable (otherwise rests), M meows, and R returns to the last clear spot. Pause also offers a return to the home lane and afternoon/evening lighting.
+Free roam starts in the gali outside home. The kitten walks at 0.55 units a second and runs at 1.45, easing in and out of motion; `dist/kitten-gait.mjs` lengthens the authored stride and plays the legs at the rate that matches the ground actually covered, so the paws do not slide. WASD moves, Shift runs, Space jumps, moving the mouse looks around, and scrolling or +/− zooms. Click Explore/Continue to capture the mouse; Escape releases it and pauses. Browsers that deny mouse capture fall back to ordinary mouse movement without holding a button. Tab opens the map. E climbs through the bedroom window when reachable (otherwise rests), M meows, and R returns to the last clear spot. Pause also offers a return to the home lane and afternoon/evening lighting.
 
 Exploration uses `nobodys-home-kolkata-explore-v2`, separate from the story save. The original story still starts in the bedroom, with food, radio and a window exit. It uses the same improved mouse-look and camera boom.
 
@@ -26,8 +26,9 @@ Free roam is a North Kolkata para of narrow lanes, laid out in `dist/explore-lay
 - **Houses.** Claude’s six authored houses appear once each, in their original order, on the north side of the main lane; the furnished home fronts the home gali. Fifty-one more houses come from `dist/procedural-buildings.mjs`: old townhouses with rowaks, arched openings, louvred shutters and iron balconies; 1970s flats with grille boxes and jali stair shafts; bare-brick new builds; tin sheds; shop-houses with Bengali signboards. Each lot has a fixed seed, so no house repeats and nothing changes between visits. Party walls are bare brick or cement; walls facing a lane get windows, pipes and meters.
 - **Wear.** Plaster, brick and cement share world-space weathering shaders (`dist/procedural-view.mjs`): rising damp, streaks, plaster peeled back to brick. `dist/decals.mjs` draws one atlas of signs, posters, wall writing, paan stains, moss, drain grime and potholes.
 - **Clutter.** `dist/street-clutter.mjs` places open drains with slabs, garbage heaps with crows, cycles, drums, crates, washing lines, bunting, poles and the overhead wire tangle, chalk hopscotch, alpona, a cricket wicket on a wall. Anything worth bumping into has a collision box.
-- **Trees.** `dist/trees.mjs` grows banyan, peepal, krishnachura, radhachura, neem, mango, jackfruit, kadam, coconut, betel-nut, banana and bamboo from seeds, plus peepal saplings rooted in walls.
-- **Props.** `dist/assets/kolkata-props.glb` holds the Ambassador taxi, hand-pulled rickshaw, cycle van, auto, minibus, bus, tram, tube well, phuchka stall, fruit cart, bins, bus shelter and lamps, exported flat-coloured by `tools/export_kolkata_props.py`. The four authored shops still come from `kolkata-street.glb`.
+- **Trees.** `dist/trees.mjs` grows banyan, peepal, krishnachura, radhachura, neem, mango, jackfruit, kadam, coconut, betel-nut, banana and bamboo from seeds, plus peepal saplings rooted in walls. About forty stand in yards, at lane corners, on the footpath in blue-and-white guards, and as palms behind the roofs.
+- **Blue and white.** Railings run along the footpath, round the pond (open at the ghat) and in front of the red block; lamp posts, trident lamps, bollards, tram poles and the painted kerb use the same city colours.
+- **Props.** `dist/assets/kolkata-props.glb` holds the Ambassador taxi, hand-pulled rickshaw, cycle van, auto, minibus, bus, tram, tube well, phuchka stall, fruit cart, bins, bus shelter and lamps, plus the shrine tree and the long red British-era block that faces the para across the tram road, exported flat-coloured by `tools/export_kolkata_props.py`. The four authored shops still come from `kolkata-street.glb`.
 
 Everything generated is instanced and grouped into large chunks; a typical view is 150–350 draw calls. Do not randomize seeds on load or distort the authored assets. Add `?inspect` to the URL for a frame readout and `window.__explore.look(x, z, yaw, pitch, distance)` to frame a still.
 
@@ -51,6 +52,7 @@ node tests/follow-camera.test.mjs
 node tests/mouse-look.test.mjs
 node tests/procedural.test.mjs
 node tests/graphics.test.mjs
+node tests/gait.test.mjs
 ```
 
 ## Project map
@@ -63,6 +65,7 @@ node tests/graphics.test.mjs
 - `dist/assets/kolkata-props.glb`, `dist/props-data.mjs`: exported vehicles and street furniture with their bounds (`tools/export_kolkata_props.py`).
 - `dist/graphics.mjs`: shared render scale limits and saved graphics preference.
 - `dist/mouse-look.mjs`, `dist/follow-camera.mjs`: shared mouse capture and collision-aware camera.
+- `dist/kitten-gait.mjs`: stride lengthening and leg-speed matching for free roam.
 - `dist/story.html`, `dist/style.css`: preserved story shell and interface.
 - `dist/game.js`: 3D world, player, camera, interactions and threats.
 - `dist/threats.mjs`: dog and infected detection and reactions.

@@ -36,7 +36,10 @@ export function makeTree(kind,seed,x0,z0,scale=.75,base={}){
    blob(c,r,r*sp.sq,LEAF[pick(sp.leaves)]);
    if(sp.flower&&R()<sp.flower[1])blob([c[0]+range(-.3,.3),c[1]+r*sp.sq*.4,c[2]+range(-.3,.3)],r*.78,r*sp.sq*.45,sp.flower[0],'flower');
    if(sp.fruit&&R()<.4)for(let k=0;k<int(3,6);k++){const a=range(0,6.28),rr=r*range(.6,1);P('blob','flower',c[0]+rr*Math.cos(a),c[1]+range(-r*.4,r*.2),c[2]+rr*Math.sin(a),sp.fruit[1],sp.fruit[1]*1.3,sp.fruit[1],0,0,sp.fruit[0])}
-   if(sp.props&&R()<.8&&c[1]>2.5)for(let k=0;k<int(2,4);k++){const px=c[0]+range(-r*.5,r*.5),pz=c[2]+range(-r*.5,r*.5);limb([px+range(-.2,.2),0,pz+range(-.2,.2)],[px,c[1]-r*.3,pz],.06,bark)}
+   // Banyan aerial roots: near the trunk they reach the ground and thicken; further out they just hang.
+   if(sp.props&&c[1]>2.5){const far=Math.hypot(c[0],c[2]);
+    if(far<2.4){if(R()<.7)for(let k=0;k<int(1,2);k++){const px=c[0]*.7+range(-.4,.4),pz=c[2]*.7+range(-.4,.4);limb([px+range(-.15,.15),0,pz+range(-.15,.15)],[px,c[1]-r*.3,pz],.045,bark)}}
+    else for(let k=0;k<int(1,3);k++){const px=c[0]+range(-r*.5,r*.5),pz=c[2]+range(-r*.5,r*.5),top=c[1]-r*.35;limb([px+range(-.06,.06),top-range(.8,2.2),pz+range(-.06,.06)],[px,top,pz],.018,bark)}}
   }
   if(sp.buttress)for(let k=0;k<int(4,6);k++){const a=range(0,6.28),L=r0*range(1.6,2.6);limb([L*Math.cos(a),0,L*Math.sin(a)],[r0*.4*Math.cos(a),r0*1.9,r0*.4*Math.sin(a)],r0*.3,bark)}
   if(sp.trunkFruit)for(let k=0;k<int(3,6);k++){const a=range(0,6.28),y=range(.8,H*.8);P('blob','flower',r0*1.1*Math.cos(a),y,r0*1.1*Math.sin(a),.17,.28,.17,0,0,0x7f9440)}

@@ -29,6 +29,8 @@ SPECS = [
     ("BusShelter", ["Bus shelter (blue-white)"], None),
     ("TridentLamp", ["Trident lamps"], (0.0, 1e9)),
     ("LampPost", ["Lamp posts (blue-white)"], (0.0, 12.0)),
+    ("RedBlock", ["Writers-style red block"], None),
+    ("ShrineTree", ["Shrine tree"], None),
 ]
 
 flat_cache = {}

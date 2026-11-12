@@ -110,8 +110,7 @@ row('E',-27,7.5,[{w:2.8,d:3,style:'brick',floors:2,scenery:true}]);
 row('S',-23,-33,['flat','old','brick','flat','old','flat','old','brick','flat','old','flat','old'].map((style,i)=>({w:4.6+(i%3)*.5,d:4,style,floors:3+(i%2),scenery:true})));
 row('E',25.8,-45,['flat','shop','old','flat','shop'].map((style,i)=>({w:4.48,d:4,style,floors:3+(i%2),scenery:true,shops:style==='shop'?[['','','shut'],['','','shut']]:undefined})));
 row('E',25.8,16.1,['old','shop','flat'].map((style,i)=>({w:5.3,d:4,style,floors:3,scenery:true,shops:style==='shop'?[['','','shut'],['','','shut']]:undefined})));
-row('W',37.2,-45,['shop','flat','old','shop','flat','old','shop','brick','shop','old','flat','shop','old','flat','shop'].map((style,i)=>({w:5.2,d:4,style,floors:3+(i%3===0?1:0),scenery:true,
- shops:style==='shop'?[[['রয়্যাল ইন্ডিয়ান হোটেল','ROYAL HOTEL','red'],['কল্পনা বস্ত্রালয়','SAREE EMPORIUM','blue'],['মডার্ন অপটিক্যাল','OPTICIANS','green']][i%3],['','','shut']]:undefined})));
+// The far side of the big road is the long red British-era block (an exported model, see `assets`).
 export const proceduralBuildings=lots.map(lot=>generateBuilding(lot.seed,lot));
 
 // ---------------------------------------------------------------- authored shops and exported street props
@@ -126,13 +125,23 @@ export const assets=[
  {name:'FruitCart',x:26.55,z:-8.1,angle:Math.PI/2},{name:'Bins',x:26.2,z:5.2,angle:Math.PI/2},
  {name:'Auto',x:28.35,z:-15.6,angle:Math.PI/2+.05},{name:'Taxi',x:28.25,z:2.4,angle:-Math.PI/2+.02},{name:'Minibus',x:29.1,z:-2.9,angle:-Math.PI/2},
  {name:'Tram',x:31.9,z:-11.5,angle:Math.PI/2},{name:'Bus',x:33.4,z:6.5,angle:-Math.PI/2},{name:'BusShelter',x:26.55,z:-3.2,angle:-Math.PI/2},
- {name:'TridentLamp',x:26.9,z:-19.4,angle:Math.PI/2},{name:'TridentLamp',x:26.9,z:9.9,angle:Math.PI/2},{name:'LampPost',x:27.05,z:-6.1,angle:-Math.PI/2},{name:'LampPost',x:27.05,z:4,angle:-Math.PI/2}
+ {name:'TridentLamp',x:26.9,z:-19.4,angle:Math.PI/2},{name:'TridentLamp',x:26.9,z:9.9,angle:Math.PI/2},{name:'LampPost',x:27.05,z:-6.1,angle:-Math.PI/2},{name:'LampPost',x:27.05,z:4,angle:-Math.PI/2},
+ // Inside the para: the blue-and-white lamp posts, trident lamps, bins and the shrine tree.
+ {name:'LampPost',x:-30.2,z:-10.25,angle:Math.PI},{name:'LampPost',x:17,z:-10.3,angle:Math.PI},{name:'LampPost',x:-9.2,z:9.5,angle:Math.PI},
+ {name:'TridentLamp',x:-26,z:-9.78,angle:0},{name:'TridentLamp',x:14.45,z:1.05,angle:Math.PI/2},{name:'Bins',x:.1,z:7.25,angle:0},{name:'ShrineTree',x:19.3,z:1.1,angle:Math.PI/2},
+ {name:'Auto',x:29.2,z:8.6,angle:-Math.PI/2-.04},{name:'RedBlock',x:46.4,z:-6,angle:-Math.PI/2}
 ];
 // Seeded trees: [kind, x, z, seed, scale]. Trunks are solid; canopies are above everything.
 export const trees=[
- ['banyan',-25.35,-8.35,3,.62],['krishnachura',19.6,1.3,22,.5],['neem',-23.4,3.9,41,.55],['coconut',-32.2,-3.4,91,.62],['coconut',-25.6,-2.9,93,.6],
+ ['banyan',-25.35,-8.35,3,.62],['neem',-23.4,3.9,41,.55],['coconut',-32.2,-3.4,91,.62],['coconut',-25.6,-2.9,93,.6],['krishnachura',-27.6,-3.95,24,.5],
  ['supari',-33,3.6,101,.6],['banana',-31.6,4.2,111,.62],['banana',-24.2,-.6,112,.6],['banana',20.2,-2.4,113,.55],['bamboo',-32.6,-1.2,121,.6],
- ['peepal',-1.2,7.45,12,.42],['radhachura',26.6,-13.7,31,.5],['kadam',26.6,7.2,81,.5],['mango',-9.8,-19.6,51,.5],['jackfruit',6.3,-20.2,61,.48]
+ ['peepal',-1.2,7.45,12,.42],['mango',-9.8,-19.6,51,.5],['jackfruit',6.3,-20.2,61,.48],['neem',-17.6,-20.2,43,.45],['coconut',1.6,-19.8,94,.6],['supari',-13.3,-20.1,102,.55],
+ ['peepal',-33.25,-12.55,13,.42],['radhachura',19.52,-13.7,33,.42],['neem',13.62,-4.62,44,.4],['kadam',24.95,8.22,82,.42],
+ // Footpath trees in blue-and-white guards, and a row in front of the red block.
+ ['radhachura',26.6,-13.7,31,.5],['kadam',26.6,7.2,81,.5],['krishnachura',26.6,-21.6,23,.5],['neem',26.6,14,42,.5],['radhachura',26.6,-30,32,.5],['krishnachura',26.6,22,21,.5],
+ ['krishnachura',35.3,-26,25,.58],['radhachura',35.3,-16.5,34,.55],['neem',35.3,4.5,45,.58],['krishnachura',35.3,14.5,26,.55],['radhachura',35.3,24,35,.55],
+ // Palms rising behind the houses and beyond the west wall.
+ ['coconut',-20,17.6,95,.95],['coconut',-6,17.9,96,.95],['coconut',9,17.6,97,.95],['coconut',18,18.1,98,.9],['supari',2,17.7,103,.9],['coconut',-35.4,-2,99,.9],['coconut',-35.6,3.2,100,.85],['bamboo',-35.5,-6.8,122,.8]
 ];
 export const trunkRadius={banyan:.42,krishnachura:.17,neem:.16,coconut:.13,supari:.06,banana:.12,bamboo:.3,peepal:.15,radhachura:.15,kadam:.16,mango:.2,jackfruit:.2};
 // Boundary and yard walls: [x, y, z, width, height, depth, material].
@@ -143,8 +152,15 @@ export const walls=[
  [-27.1,1,9.05,.2,2,2.1,'cement'],
  // Back yards of the authored houses, each with a slit left for the cat.
  [-24.6,.75,-20.62,5.3,1.5,.12,'brick'],[-17.8,.75,-20.62,4.4,1.5,.12,'cement'],[-13.2,.75,-20.62,3.3,1.5,.12,'brick'],[-8.85,.75,-20.62,3.9,1.5,.12,'cement'],[1.4,.75,-20.62,4.6,1.5,.12,'brick'],
- [27.22,.62,-17.6,.05,.44,6.6,'rail'],[27.22,.62,-4.6,.05,.44,8,'rail'],[27.22,.62,4.3,.05,.44,6.4,'rail']
+ [27.22,.62,-17.6,.05,.44,6.6,'rail'],[27.22,.62,-4.6,.05,.44,8,'rail'],[27.22,.62,4.3,.05,.44,6.4,'rail'],
+ // Blue-and-white railing round the pond, open at the ghat steps.
+ [-32.6,.62,.5,.05,.44,6.2,'rail'],[-28.65,.62,-2.6,7.9,.44,.05,'rail'],[-28.65,.62,3.6,7.9,.44,.05,'rail'],[-24.7,.62,-1.65,.05,.44,1.9,'rail'],[-24.7,.62,2.65,.05,.44,1.9,'rail'],
+ // The long railing in front of the red block, open at its steps.
+ [35.95,.62,-27,.05,.44,31,'rail'],[35.95,.62,14.5,.05,.44,31,'rail'],
+ // Tree guards on the footpath.
+ ...[-13.7,7.2,-21.6].flatMap(z=>[[26.6,.62,z-.45,.9,.44,.05,'rail'],[26.6,.62,z+.45,.9,.44,.05,'rail'],[26.15,.62,z,.05,.44,.9,'rail'],[27.05,.62,z,.05,.44,.9,'rail']])
 ];
+export const bollards=[[26.4,-13.2],[26.9,-13.2],[26.4,-9.4],[26.9,-9.4],[26.4,7.85],[26.9,7.85],[26.4,10.25],[26.9,10.25],[-20.8,-13.15],[19.6,-12.85],[20.5,-12.85]];
 export const poles=[[-30.6,-12.45],[-21.62,-12.7],[-12.3,-10.05],[-2.6,-12.05],[6.4,-10.05],[15.8,-12.05],[24.9,-10],[-9.2,-6.15],[7.2,-6.15],[-14.2,8.15],[-2.2,9.95],[10.2,8.15],[21.2,9.95],[-21.3,-1.6],[13.74,3.4]];
 export const benches=[[18.6,.3,2.45,1.4,.07,.3],[2.6,.3,9.78,1.3,.07,.3]];
 export const clutter=makeClutter({lanes,buildings:proceduralBuildings,houses,poles,trees,benches,pond});
@@ -165,6 +181,8 @@ export function assetSolids(a){
   case 'FruitCart':return [box(-.95,.95,-.6,.6,.25,1.1)];
   case 'BusShelter':return [box(b.minX,b.maxX,b.maxZ-.15,b.maxZ,.5,2.6),box(b.minX+.2,b.maxX-.2,-.3,.3,.3,.5)];
   case 'TridentLamp':case 'LampPost':return [box(-.2,.2,-.2,.2,0,4)];
+  case 'RedBlock':return [];
+  case 'ShrineTree':return [box(-.5,.5,-.5,.5,0,4),box(-.9,.9,.4,1.4,0,.45)];
   default:return [box(b.minX,b.maxX,b.minZ,b.maxZ,0,b.top)];
  }
 }
@@ -185,6 +203,7 @@ export function makeCollisionWorld(){
  solids.push({minX:pond.x-pond.rx,maxX:pond.x+pond.rx,minZ:pond.z-pond.rz*.45,maxZ:pond.z+pond.rz*.45,bottom:-1,top:1.6});
  for(const [kind,x,z,,scale] of trees){const r=trunkRadius[kind]*(scale/.6);solids.push({minX:x-r,maxX:x+r,minZ:z-r,maxZ:z+r,bottom:0,top:3})}
  solids.push({minX:-26.05,maxX:-24.65,minZ:-9.05,maxZ:-7.65,bottom:0,top:.3});               // the shrine platform round the banyan
+ for(const [x,z] of bollards)solids.push({minX:x-.06,maxX:x+.06,minZ:z-.06,maxZ:z+.06,bottom:0,top:.7});
  for(const [x,z] of poles)solids.push({minX:x-.07,maxX:x+.07,minZ:z-.07,maxZ:z+.07,bottom:0,top:5});
  for(const b of benches)for(const dx of [-.5,.5])solids.push({minX:b[0]+dx-.03,maxX:b[0]+dx+.03,minZ:b[2]-.12,maxZ:b[2]+.12,bottom:0,top:.28});
  for(const c of clutter.solids)solids.push(c);

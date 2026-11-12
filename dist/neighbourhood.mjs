@@ -5,7 +5,7 @@ import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 import {createKit} from './procedural-view.mjs';
 import {createDecals} from './decals.mjs';
 import * as home from './home.mjs';
-import {houses,props,assets,walls,lanes,pond,proceduralBuildings,clutter,SCALE} from './explore-layout.mjs';
+import {houses,props,assets,walls,lanes,pond,bollards,proceduralBuildings,clutter,SCALE} from './explore-layout.mjs';
 
 export async function buildNeighbourhood(scene,onProgress=()=>{}){
  const kit=createKit(scene),decals=createDecals(),obstacles=[],staticGroups=[],homeInterior=[];
@@ -24,11 +24,20 @@ export async function buildNeighbourhood(scene,onProgress=()=>{}){
  for(let z=-44;z<32;z+=2.4)P('box','paint',29.9,.0262,z,.07,.004,1.1,0,0,0xcfd0c4);
  // Boundary walls, yard walls and the blue-and-white railing of the footpath.
  for(const [x,y,z,w,h,d,m] of walls){
-  if(m==='rail'){const n=Math.round(d/1.1);for(let i=0;i<=n;i++){const zz=z-d/2+d*i/n;P('box','paint',x,.5,zz,.05,.82,.05,0,0,0xe6e9e6);P('box','paint',x,.93,zz,.065,.05,.065,0,0,0x2f79c2)}
-   for(let i=0;i<n;i++){const zz=z-d/2+d*(i+.5)/n,c=i%2?0xe6e9e6:0x2f79c2;for(const yy of [.4,.62,.84])P('box','paint',x,yy,zz,.03,.03,d/n,0,0,c);for(let k=1;k<5;k++)P('box','paint',x,.62,z-d/2+d*i/n+d/n*k/5,.016,.44,.016,0,0,c)}
+  if(m==='rail'){ // posts, three rails and thin bars, bay by bay in alternating blue and white
+   const alongX=w>d,len=alongX?w:d,n=Math.max(1,Math.round(len/1.1)),base=x>25.8&&x<27.3?.09:.025,at=t=>alongX?[x-len/2+t,z]:[x,z-len/2+t];
+   for(let i=0;i<=n;i++){const [px,pz]=at(len*i/n);P('box','paint',px,base+.41,pz,.05,.82,.05,0,0,0xe6e9e6);P('box','paint',px,base+.84,pz,.065,.05,.065,0,0,0x2f79c2)}
+   for(let i=0;i<n;i++){const c=i%2?0xe6e9e6:0x2f79c2,[mx,mz]=at(len*(i+.5)/n),bay=len/n;
+    for(const yy of [.31,.53,.75])P('box','paint',mx,base+yy,mz,alongX?bay:.03,.03,alongX?.03:bay,0,0,c);
+    for(let k=1;k<5;k++){const [bx,bz]=at(len*i/n+bay*k/5);P('box','paint',bx,base+.53,bz,.016,.44,.016,0,0,c)}}
    continue}
   P('box',m,x,y,z,w,h,d,0,0,m==='plaster'?0xc8b27a:m==='cement'?0x9a9486:undefined);P('box','concrete',x,y+h/2+.02,z,w+.06,.04,d+.06);
  }
+
+ for(const [x,z] of bollards){const base=x>25.8?.09:.025;P('cyl','paint',x,base+.19,z,.05,.38,.05,0,0,0x2f79c2);P('cyl','paint',x,base+.52,z,.05,.28,.05,0,0,0xe6e9e6);P('cyl','paint',x,base+.68,z,.058,.04,.058,0,0,0x2f79c2)}
+ // Tram poles with bracket arms and the overhead wire the trolley pole rides on.
+ for(let z=-40;z<=30;z+=14){for(let k=0;k<6;k++)P('cyl','paint',27.12,.09+.45+k*.9,z,.06,.9,.06,0,0,k%2?0xe6e9e6:0x2f79c2);P('cyl','railsteel',29.5,5.42,z,.022,4.8,.022,Math.PI/2,Math.PI/2);P('box','paint',31.9,5.2,z,.02,.42,.02,0,0,0x151515)}
+ clutter.wires.push({pts:[[31.9,4.98,-44],[31.9,4.96,-20],[31.9,4.98,4],[31.9,4.96,31]],r:.01});
 
  // ------------------------------------------------------------ generated houses
  const parent=new THREE.Matrix4();
@@ -57,9 +66,9 @@ export async function buildNeighbourhood(scene,onProgress=()=>{}){
  for(const p of props){const source=streetGltf.scene.getObjectByName(p.name);if(!source)throw new Error('Missing authored asset: '+p.name);const model=source.clone(true);model.scale.setScalar(SCALE);model.position.set(p.x,0,p.z);model.rotation.y=p.angle;prepare(model);scene.add(model);model.updateMatrixWorld(true);
   model.traverse(o=>{if(o.isMesh&&!o.material.transparent)obstacles.push(o)});staticGroups.push(model);
  }
- for(const a of assets){const source=propGltf.scene.getObjectByName(a.name);if(!source)throw new Error('Missing street prop: '+a.name);const model=source.clone(true);model.scale.setScalar(SCALE);model.position.set(a.x,a.name==='BusShelter'||a.name==='FruitCart'||a.name==='Bins'||a.name==='TridentLamp'||a.name==='LampPost'?.09:0,a.z);model.rotation.y=a.angle;prepare(model,false);
+ for(const a of assets){const source=propGltf.scene.getObjectByName(a.name);if(!source)throw new Error('Missing street prop: '+a.name);const model=source.clone(true);model.scale.setScalar(SCALE);model.position.set(a.x,a.x>25.8&&a.x<27.3?.09:0,a.z);model.rotation.y=a.angle;prepare(model,false);
   model.traverse(o=>{if(o.isMesh){const flat=/Tram|Bus|Minibus|Rickshaw|CycleVan|HandPump|Phuchka|FruitCart|Bins|Shelter|Lamp/.test(a.name);for(const m of Array.isArray(o.material)?o.material:[o.material]){if(m.transparent){m.depthWrite=false;o.castShadow=false}}}});
-  scene.add(model);model.updateMatrixWorld(true);model.traverse(o=>{if(o.isMesh&&!o.material.transparent)obstacles.push(o)});staticGroups.push(model);
+  scene.add(model);model.updateMatrixWorld(true);if(a.name==='RedBlock')model.userData.reach=40;else model.traverse(o=>{if(o.isMesh&&!o.material.transparent)obstacles.push(o)});staticGroups.push(model);
  }
  const model=homeGltf.scene;model.scale.setScalar(SCALE);model.rotation.y=Math.PI;model.position.set((home.sourceOrigin+3.7)*SCALE,0,home.FRONT_Z);prepare(model);scene.add(model);model.updateMatrixWorld(true);
  model.traverse(o=>{if(o.isMesh){if(!(o.material.transparent&&o.material.opacity<.6))obstacles.push(o);if(!/shell|floor|yard|door|window|shutter|roof|Cornice|Parapet/i.test(o.name))homeInterior.push(o)}});
@@ -67,7 +76,7 @@ export async function buildNeighbourhood(scene,onProgress=()=>{}){
  const spheres=instanced.map(m=>m.boundingSphere);
  return {obstacles,staticGroups,updateVisibility(position){
   const nearHome=Math.hypot(position.x,position.z)<10;for(const o of homeInterior)o.visible=nearHome;
-  for(const o of staticGroups)o.visible=Math.hypot(o.position.x-position.x,o.position.z-position.z)<46;
+  for(const o of staticGroups)o.visible=Math.hypot(o.position.x-position.x,o.position.z-position.z)-(o.userData.reach||0)<46;
   instanced.forEach((m,i)=>{const s=spheres[i];m.visible=Math.hypot(s.center.x-position.x,s.center.z-position.z)-s.radius<52});
  }};
 }

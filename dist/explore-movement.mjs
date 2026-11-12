@@ -1,6 +1,7 @@
-
+export const WALK_SPEED=.55,RUN_SPEED=1.45;
 export function advancePlayer(p,input,dt,world){
- const length=Math.hypot(input.x,input.z),speed=input.running?2.25:1.05;
+ // A kitten's pace: a brisk walk and a scurry. `pace` (0…1) eases starts and stops.
+ const length=Math.hypot(input.x,input.z),speed=(input.running?RUN_SPEED:WALK_SPEED)*(input.pace??1);
  if(length){const dx=input.x/length*speed*dt,dz=input.z/length*speed*dt;
   // Substeps keep sprinting and low frame rates from tunnelling through thin rails.
   const steps=Math.max(1,Math.ceil(Math.hypot(dx,dz)/.035));
